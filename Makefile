@@ -127,7 +127,7 @@ install-release: release
 # ── Artifact Evaluation (SOSP) ────────────────────────────────────────
 # Three tiers: figures-from-cache, sample verification, full end-to-end.
 # See ae/README.md for the full guide.
-.PHONY: ae-help check ae-install ae-fmpp ae-cache ae-cache-figures figures report serve verify verify-recall verify-predict bench-fig14 bench-table3 bench-table3-real bench-baselines full reproduce-all appendix ae-clean
+.PHONY: ae-help check ae-install ae-fmpp ae-cache ae-cache-figures figures report serve verify verify-fmpp-roundtrip verify-recall verify-predict bench-fig14 bench-table3 bench-table3-real bench-fmpp bench-fmpp-real bench-baselines full reproduce-all appendix ae-clean
 
 # PY = python interpreter; N = sample size for `make verify`
 # FMT = figure format; png so ae/RESULTS.md displays them inline (pdf for paper)
@@ -137,7 +137,7 @@ N ?= 200
 FMT ?= png
 
 ae-help:
-	@echo "TensorDex AE targets (start with `make check`):"
+	@echo "TensorDex AE targets (start with \`make check\`):"
 	@echo "  check       - build works? hash + tests, NO download (~30s)"
 	@echo "  ae-install  - build+install the package (Rust extension)"
 	@echo "  ae-fmpp     - rebuild with the FM++ codec so verify also checks fratio"
@@ -147,11 +147,14 @@ ae-help:
 	@echo "  report      - build ae/results.html (single-column, figures embedded)"
 	@echo "  serve       - build + serve results.html on :8000 (tunnel for public URL)"
 	@echo "  verify      - Tier 1: re-derive a random sample from raw bytes (N=$(N))"
+	@echo "  verify-fmpp-roundtrip - self-contained FM++ byte-exact check (no cache)"
 	@echo "  verify-recall - Tier 1: TensorSketch Recall@1 experiment (Fig 12a)"
 	@echo "  verify-predict - Tier 1: re-fit TensorPred from cache, held-out eval (Fig 13)"
 	@echo "  bench-fig14 - run ILP/Primal-Dual/FlexSplit solvers, re-render Fig 14"
 	@echo "  bench-table3 - codec throughput, synthetic pair (Table 3 methodology)"
 	@echo "  bench-table3-real - Table 3's exact setup: real Qwen2.5-7B pair (~30GB dl)"
+	@echo "  bench-fmpp  - FM++ parallel encode/decode + round trip (synthetic)"
+	@echo "  bench-fmpp-real - FM++ parallel benchmark on Qwen2.5-7B pair (~30GB dl)"
 	@echo "  bench-baselines - ZipNN/OpenZL baseline throughput on real weights"
 	@echo "  full        - Tier 2: run the pipeline end-to-end (demo mode)"
 	@echo "  reproduce-all - everything offline in one go (Tier 0+1+2 + report)"
@@ -196,6 +199,9 @@ figures:
 verify:
 	$(PY) ae/verify_sample.py --n $(N)
 
+verify-fmpp-roundtrip:
+	$(PY) ae/verify_fmpp_roundtrip.py
+
 verify-recall:
 	$(PY) ae/verify_recall.py
 
@@ -238,6 +244,16 @@ bench-baselines:
 
 bench-table3-real:
 	@BASE=$$($(PY) -c "from huggingface_hub import snapshot_download; print(snapshot_download('Qwen/Qwen2.5-7B', allow_patterns=['*.safetensors']))") && 	TGT=$$($(PY) -c "from huggingface_hub import snapshot_download; print(snapshot_download('Qwen/Qwen2.5-7B-Instruct', allow_patterns=['*.safetensors']))") && 	cargo run --release --example table3_bench -- --base-model $$BASE --target-model $$TGT
+
+# FM++ preserves each arithmetic-coded tensor stream and schedules independent
+# streams on Rayon. The benchmark also decodes and byte-compares every output.
+bench-fmpp:
+	cargo run --release --features fmpp --example fmpp_bench
+
+bench-fmpp-real:
+	@BASE=$$($(PY) -c "from huggingface_hub import snapshot_download; print(snapshot_download('Qwen/Qwen2.5-7B', allow_patterns=['*.safetensors']))") && \
+	TGT=$$($(PY) -c "from huggingface_hub import snapshot_download; print(snapshot_download('Qwen/Qwen2.5-7B-Instruct', allow_patterns=['*.safetensors']))") && \
+	cargo run --release --features fmpp --example fmpp_bench -- --base-model $$BASE --target-model $$TGT
 
 # Build a self-contained single-column HTML results page (ae/results.html) from
 # the already-rendered figures (run `make figures` first). Fast — no re-render.

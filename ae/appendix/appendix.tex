@@ -156,11 +156,12 @@ FlexSplit $\approx$ ILP optimum, near-constant time (Fig.~14) &
 \code{make bench-fig14} & solver sweep re-run live \\
 \addlinespace[2pt]
 Codec throughput (Table~3, Fig.~1-right) &
-\code{make bench-table3-real} & 22.9\,/\,28.4~GB/s reference on
-c6a.48xlarge \\
+\code{make bench-table3-real}; \code{make bench-fmpp-real} & TensorX and
+FM++ parallel encode/decode, byte-exact \\
 \bottomrule
 \multicolumn{3}{@{}l@{}}{\footnotesize Throughput variants:
-\code{bench-table3} $\cdot$ \code{bench-baselines} (ZipNN, OpenZL,
+\code{bench-table3} $\cdot$ \code{bench-fmpp} $\cdot$
+\code{bench-baselines} (ZipNN, OpenZL,
 official BitX).} \\
 \end{tabular}
 \end{center}
@@ -330,6 +331,7 @@ TensorX):
 make ae-fmpp             # maturin develop --release --features fmpp
 make verify              # N=200 default; or:
 python ae/verify_sample.py --n 300 --seed 7     # your own seed and size
+make verify-fmpp-roundtrip  # synthetic FM++ round trip; no cache needed
 \end{shell}
 \begin{term}
 Scanning blob store ae/cache/sample_blobs ...
@@ -360,7 +362,9 @@ codec actually produces on those bytes. You pick the seed, so we could not
 have pre-selected favorable rows. (The one non-bit-exact row above is a
 documented \emph{legacy row} --- it predates the final codec build and is
 reported with its timestamp; its content ids still match, and the run still
-PASSes. See Notes.)
+PASSes. See Notes.) The separate FM++ round-trip command needs no cache: it
+generates deterministic synthetic base/target tensors, creates fresh deltas,
+decodes them, and requires byte-exact reconstruction.
 
 \subsection{TensorSketch Recall@1 (Fig.~12a)}
 
@@ -432,12 +436,15 @@ compute across all cores. Below is this command's output on a c6a.48xlarge
 during packaging --- reduction matches the paper exactly and throughput lands
 on the published numbers. Baseline rows in Table~3 cite each system's own
 published figures (ZipLLM, ZipNN, OpenZL); \code{ae/bench\_baselines.py}
-re-runs the external tools where they are installed.
+re-runs the external tools. The Docker image includes the submission-time
+versions, ZipNN~0.5.3 and OpenZL~v0.1.0.
 
 \begin{shell}
 make bench-table3-real   # ~30 GB model download on first run, ~32 GB RAM
 make bench-table3        # synthetic variant, no download
-make bench-baselines     # ZipNN / OpenZL (optional external tools)
+make bench-fmpp-real     # native tensor-pair parallel FM++ + decoder
+make bench-fmpp          # synthetic FM++ variant, no download
+make bench-baselines     # ZipNN 0.5.3 / OpenZL v0.1.0
 \end{shell}
 \begin{term}
 TensorX codec throughput - real model pair (14525 MB across 7481
@@ -450,6 +457,15 @@ paper reference (c6a.48xlarge, 192 vCPU, real Qwen2.5-7B pair):
   22.9 / 28.4 GB/s @ 59.4%
 RESULT: PASS  round-trip byte-exact; throughput measured
 \end{term}
+
+The FM++ benchmark keeps every arithmetic-coded tensor stream intact and uses
+Rayon to schedule independent tensor pairs across cores, matching the original
+aggregate-throughput methodology. Before timing, it materializes every delta,
+decodes it against its base, and requires byte-exact reconstruction. The real
+variant uses the same Qwen2.5-7B Base\,/\,Instruct pair and needs roughly
+40~GB of RAM. Aggregate throughput depends on the CPU count and the tensor-size
+distribution; a single model pair can exhibit a long tail from its largest
+embedding tensors.
 
 \subsection{Everything in one command}
 

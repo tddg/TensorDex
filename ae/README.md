@@ -56,6 +56,10 @@ docker run -it --rm -v tensordex-cache:/tensordex/ae/cache tensordex-ae bash
 # inside the container:  make ae-cache && make reproduce-all
 ```
 
+The image also includes the external baseline versions used at submission:
+ZipNN 0.5.3 and OpenZL v0.1.0. Therefore `make bench-baselines` runs both
+without extra installation.
+
 ### One command for everything offline
 
 After `make ae-cache`, a single target runs Tier 0 + Tier 1 + the Tier 2 demo
@@ -69,13 +73,13 @@ make reproduce-all
 
 | Claim (paper) | Command | Expected |
 |---|---|---|
-| **70.5 %** storage reduction — TensorDex-FM++ (Fig 1, 11) | `make ae-fmpp && make verify` | `fratio` bit-exact vs cache; `codec_storage_reduction.png` → 0.29× |
+| **70.5 %** storage reduction — TensorDex-FM++ (Fig 1, 11) | `make ae-fmpp && make verify && make verify-fmpp-roundtrip` | `fratio` bit-exact vs cache; decoded tensors byte-exact; `codec_storage_reduction.png` → 0.29× |
 | **65.1 %** reduction — TensorDex-TX | `make verify` | `tratio` bit-exact (100 %) |
 | Tensor dedup by content hash (§5.1) | `make verify` | content ids 100 % exact |
 | **Recall@1 = 1.00** — TensorSketch (Fig 12a) | `make verify-recall` | Recall@1 = 1.000 |
 | Reduction-ratio prediction, MAE ~1 % (Fig 13) | `make verify-predict` | re-fits TensorPred from cache; **held-out** MAE 1.11 %, Pearson 99.3 % |
 | **FlexSplit near-optimal & fast vs ILP** (Fig 14) | `make bench-fig14` | runs ILP/PD/FlexSplit solvers; FlexSplit ≈ ILP ratio at ~constant time |
-| Codec throughput (Table 3, Fig 1-right) | `make bench-table3-real` | the paper's exact setup, real Qwen2.5-7B pair: 22.9/28.4 GB/s at 59.4 % reduction (synthetic variant: `bench-table3`; external baselines: `bench-baselines`) |
+| Codec throughput (Table 3, Fig 1-right) | `make bench-table3-real`; `make bench-fmpp-real` | real Qwen2.5-7B pair: TensorX and FM++ parallel encode/decode throughput with byte-exact round trips (synthetic variants: `bench-table3`, `bench-fmpp`; external baselines: `bench-baselines`) |
 
 Start with `make check` (no download) to confirm the build, then pick a tier.
 The Artifact Appendix — the claims-to-experiment map as a single PDF — is at
@@ -198,7 +202,25 @@ FM-Delta lib in `third_party/fmdelta/`; x86_64-linux):
 ```bash
 make ae-fmpp          # maturin develop --release --features fmpp
 make verify           # now re-derives fratio too
+make verify-fmpp-roundtrip  # compress -> decompress -> byte-exact target
+make bench-fmpp       # native Rayon-parallel encode/decode smoke benchmark
+make bench-fmpp-real  # same benchmark on Qwen2.5-7B Base -> Instruct
 ```
+
+The round-trip command is a self-contained losslessness check: it generates
+deterministic synthetic `(target, base)` pairs locally, creates fresh FM++
+deltas, decodes them, and compares the reconstructed bytes with the targets.
+It needs neither `make ae-cache` nor model/tensor downloads. To additionally
+exercise more or larger synthetic pairs, pass `--n` and `--pair-kib` directly
+to `ae/verify_fmpp_roundtrip.py`.
+
+`bench-fmpp` preserves each FM++ stream as one tensor and schedules independent
+tensor pairs across Rayon workers, matching the original paper benchmark's
+parallelization strategy. It materializes the deltas, decodes all of them,
+asserts byte-exact reconstruction, and reports compression and decompression
+aggregate throughput separately. `bench-fmpp-real` downloads about 30 GB of
+model weights and needs roughly 40 GB of RAM; throughput is hardware- and
+workload-dependent.
 
 ### Recall@1 experiment (Fig 12a)
 

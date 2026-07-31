@@ -64,7 +64,10 @@ def tensorx_ratio(target_raw: bytes, base_raw: bytes,
 
 # FM++ is optional — present only when the extension was built with
 # `--features fmpp` (links the vendored FM-Delta lib). See ae/README.md.
-HAS_FMPP = hasattr(_ops, "compress_fmpp_rust")
+HAS_FMPP = (
+    hasattr(_ops, "compress_fmpp_rust")
+    and hasattr(_ops, "decompress_fmpp_rust")
+)
 
 
 def fmpp_ratio(target_raw: bytes, base_raw: bytes,
@@ -73,6 +76,15 @@ def fmpp_ratio(target_raw: bytes, base_raw: bytes,
     (compressed_bytes, ratio). Requires the `fmpp` feature build."""
     comp = _ops.compress_fmpp_rust(target_raw, base_raw, item_size)
     return len(comp), len(comp) / len(target_raw)
+
+
+def fmpp_roundtrip(target_raw: bytes, base_raw: bytes,
+                   item_size: int = BF16_ITEM_SIZE) -> Tuple[int, bool]:
+    """Compress and then decode an FM++ delta; return its size and whether
+    reconstruction is byte-for-byte identical to ``target_raw``."""
+    comp = _ops.compress_fmpp_rust(target_raw, base_raw, item_size)
+    decoded = _ops.decompress_fmpp_rust(comp, base_raw, item_size)
+    return len(comp), bytes(decoded) == target_raw
 
 
 def available_ids(blob_root: str) -> set:

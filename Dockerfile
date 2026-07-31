@@ -6,6 +6,18 @@
 #     # inside:  make ae-cache && make reproduce-all
 #
 # The named volume keeps the ~9 GB cache across container runs.
+FROM debian:bookworm-slim AS openzl-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential ca-certificates cmake git \
+    && rm -rf /var/lib/apt/lists/*
+
+# OpenZL version used for the paper's external-baseline measurements.
+RUN git clone --depth 1 --branch v0.1.0 https://github.com/facebook/openzl.git /openzl \
+    && test "$(git -C /openzl rev-parse HEAD)" = "25611c7663721aa5ca0c8af302444682820151e5" \
+    && cmake -S /openzl -B /openzl/build -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build /openzl/build --target zli -j "$(nproc)"
+
 FROM python:3.12-slim-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -22,6 +34,11 @@ WORKDIR /tensordex
 # CPU-only torch first: the pipeline never touches a GPU, and the default CUDA
 # wheels would add ~5 GB to the image for nothing.
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+# ZipNN version used for the paper's external-baseline measurements. Installing
+# it after CPU-only torch prevents pip from pulling CUDA-enabled torch wheels.
+RUN pip install --no-cache-dir zipnn==0.5.3
+
+COPY --from=openzl-builder /openzl/build/cli/zli /usr/local/bin/zli
 
 COPY . .
 
@@ -36,6 +53,11 @@ RUN pip install --no-cache-dir --config-settings=build-args="--features fmpp" . 
 # must be able to re-derive the 70.5% result; on other arches remove this).
 RUN python -c "from tensordex import _ops; \
     assert hasattr(_ops, 'compress_fmpp_rust'), 'FM++ codec missing from build'; \
-    print('OK  FM++ codec present')"
+    assert hasattr(_ops, 'decompress_fmpp_rust'), 'FM++ decoder missing from build'; \
+    print('OK  FM++ encoder + decoder present')"
+
+RUN python -c "import importlib.metadata as m; \
+    assert m.version('zipnn') == '0.5.3'; print('OK  ZipNN 0.5.3 present')" \
+    && zli --version
 
 CMD ["make", "check"]

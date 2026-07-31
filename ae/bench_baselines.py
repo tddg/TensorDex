@@ -4,8 +4,8 @@
 TensorDex's own codecs are benchmarked by `make bench-table3[-real]`. This
 script re-runs the baselines that are external tools:
 
-  - ZipNN  (`pip install zipnn`) — weight-aware lossless compressor.
-  - OpenZL (build `zli` from github.com/facebook/openzl and put it on PATH,
+  - ZipNN  (`pip install zipnn==0.5.3`) — weight-aware lossless compressor.
+  - OpenZL v0.1.0 (build `zli` from github.com/facebook/openzl and put it on PATH,
     or set $OPENZL_CLI) — measured with `zli benchmark` per 64 MB slice under
     full parallel load, so the numbers are in-process codec throughput.
 
@@ -54,8 +54,10 @@ def bench_zipnn(files, total):
     try:
         from zipnn import ZipNN
     except ImportError:
-        print("\nZipNN: SKIPPED — pip install zipnn")
+        print("\nZipNN: SKIPPED — pip install zipnn==0.5.3")
         return
+    import importlib.metadata as metadata
+    version = metadata.version("zipnn")
     # NOTE: zipnn's C extension transforms the caller's input buffer IN
     # PLACE during compress, so the round-trip must be checked against an
     # independent copy of the data (a re-read from disk), never against the
@@ -73,12 +75,12 @@ def bench_zipnn(files, total):
         decomp_t += time.perf_counter() - t0
         pristine = open(f, "rb").read()
         if bytes(d) != pristine:
-            import importlib.metadata as _im
-            print(f"\nZipNN: SKIPPED — zipnn {_im.version('zipnn')} did not "
+            print(f"\nZipNN: SKIPPED — zipnn {version} did not "
                   f"round-trip {f}; numbers from a broken decode would be "
                   f"meaningless")
             return
-    print(f"\nZipNN   reduction {comp_bytes/total:.3f}x   round-trip byte-exact ✅")
+    print(f"\nZipNN {version}   reduction {comp_bytes/total:.3f}x   "
+          "round-trip byte-exact ✅")
     print(f"  compress   {total/1e9/comp_t:6.2f} GB/s")
     print(f"  decompress {total/1e9/decomp_t:6.2f} GB/s")
 
@@ -90,9 +92,13 @@ def bench_openzl(files, total):
     slice checks integrity."""
     cli = os.environ.get("OPENZL_CLI") or shutil.which("zli")
     if not cli:
-        print("\nOpenZL: SKIPPED — build `zli` from github.com/facebook/openzl "
-              "(cmake) and put it on PATH or set $OPENZL_CLI")
+        print("\nOpenZL: SKIPPED — build `zli` v0.1.0 from "
+              "github.com/facebook/openzl and put it on PATH or set $OPENZL_CLI")
         return
+    version_result = subprocess.run(
+        [cli, "--version"], check=True, capture_output=True, text=True
+    )
+    version = (version_result.stdout + version_result.stderr).strip()
     from concurrent.futures import ThreadPoolExecutor
     import multiprocessing
     chunk = 64 * 1024 * 1024
@@ -127,7 +133,8 @@ def bench_openzl(files, total):
         os.remove(p + ".zl"); os.remove(p + ".out")
 
         workers = multiprocessing.cpu_count()
-        print(f"\nOpenZL  ({len(slice_dirs)} x 64 MB slices, {workers} parallel "
+        print(f"\nOpenZL {version}  ({len(slice_dirs)} x 64 MB slices, "
+              f"{workers} parallel "
               f"`zli benchmark` processes, profile le-u16, in-process timing)")
 
         def bench_one(d):

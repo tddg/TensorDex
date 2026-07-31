@@ -58,6 +58,8 @@ fn _ops(_py: Python, m: &PyModule) -> PyResult<()> {
     // FM++ delta codec (only when built with `--features fmpp`)
     #[cfg(feature = "fmpp")]
     m.add_function(wrap_pyfunction!(kernels::fmpp::compress_fmpp_rust, m)?)?;
+    #[cfg(feature = "fmpp")]
+    m.add_function(wrap_pyfunction!(kernels::fmpp::decompress_fmpp_rust, m)?)?;
 
     // BCS (BitCountSketch) fingerprint
     m.add_function(wrap_pyfunction!(sketch::compute_bcs_fingerprint_py, m)?)?;

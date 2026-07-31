@@ -32,5 +32,19 @@ ar rcs libfmdelta.a *.o
 cp libfmdelta.a third_party/fmdelta/libfmdelta.a
 ```
 
-The FFI TensorDex relies on: `fmd_write_to_buffer`, `fmd_write_header`,
-`fmd_write`, `fmd_write_close` (declared in `src/rust/kernels/fmpp.rs`).
+The FFI TensorDex relies on:
+
+- encode: `fmd_write_to_buffer`, `fmd_write_header`, `fmd_write`,
+  `fmd_write_close`;
+- decode: `fmd_read_from_buffer`, `fmd_read_header`, `fmd_read`,
+  `fmd_read_close`.
+
+They are declared in `src/rust/kernels/fmpp.rs`. The decode path powers
+`make verify-fmpp-roundtrip`, which checks reconstructed tensor bytes against
+the original target.
+
+The native `examples/fmpp_bench.rs` driver calls the same encoder and decoder
+from Rayon workers. Parallelism is across independent tensor streams (the
+FM-Delta arithmetic coder for one stream remains serial), matching the paper's
+aggregate-throughput methodology. Run `make bench-fmpp` for a synthetic smoke
+test or `make bench-fmpp-real` for the Qwen2.5-7B pair.
