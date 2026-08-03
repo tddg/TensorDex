@@ -648,6 +648,11 @@
     in the same minute: i4i warm via harness 130.8 s; HF traced 70.8 s
     (249 MiB/s); i4i warm <em>transport-only</em> (parallel curls to
     /dev/null) — <strong>590 MiB/s, 2.4× faster than HF's bridge</strong>.
+    Cold-origin control: re-running the stock CLI on maximally-warm SimPO
+    (served in full 4× within the hour) took 154.1 s vs the original
+    149.7 s — HF-side cache state contributes nothing measurable to CLI
+    numbers, and in the traced campaign first-ever touches (138–216 MiB/s)
+    were indistinguishable from pre-warmed models (163–236 MiB/s).
     Conclusion, replacing the earlier "client NIC" attribution: the
     ~135 MB/s harness ceiling is the client's own hash-verify +
     EBS-shard-write pipeline; burst bandwidth was available all along.

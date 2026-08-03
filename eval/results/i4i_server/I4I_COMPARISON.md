@@ -193,6 +193,15 @@ paired probe in the same window settled the attribution:
 | i4i warm SimPO via harness (verify + shard write) | 130.8 s (135 MiB/s) |
 | HF SimPO via tracer (no verify, no write) | 70.8 s (249 MiB/s) |
 | i4i warm, transport-only (8 parallel curls → /dev/null) | **590 MiB/s** |
+| stock hf CLI re-run on maximally-warm SimPO (control) | 154.1 s (vs 149.7 s original) |
+
+The last row is the cold-origin control: after the bridge had served
+SimPO in full four times within the hour, the stock CLI was no faster
+than its first run — HF-side cache state contributes nothing measurable
+to CLI numbers; the CLI is client-side limited. (Additional evidence:
+in the traced campaign, five models' first-ever touches ran 138–216
+MiB/s, indistinguishable from pre-warmed models' 163–236, and deliberate
+rep2s improved only 10–20%.)
 
 **Corrections this forces:** (1) the harness ceiling of ~135–145 MiB/s
 on big models is the CLIENT's verify + EBS-write pipeline, not the NIC
