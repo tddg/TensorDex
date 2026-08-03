@@ -1,0 +1,11 @@
+{
+  "date": "2026-08-03",
+  "client": "t3.xlarge us-east-1 (same as all other campaigns)",
+  "tool": "hf download (huggingface_hub 1.26.0, hf_xet backend), --include *.safetensors*, fresh HF_HOME per campaign, 1 rep",
+  "runs": [
+    {"model": "AhmedSSoliman/llama-3.2-3b-chat-doctor", "weights_GiB": 1.56,  "e2e_s": 24.35,  "nic_rx_MiB": 1651,  "goodput_MiBps": 65.6},
+    {"model": "HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO", "weights_GiB": 14.19, "e2e_s": 125.58, "nic_rx_MiB": 13026, "goodput_MiBps": 115.7},
+    {"model": "princeton-nlp/gemma-2-9b-it-SimPO",      "weights_GiB": 17.21, "e2e_s": 149.67, "nic_rx_MiB": 15917, "goodput_MiBps": 117.7}
+  ],
+  "note": "nic_rx below weights size = Xet chunk dedup/compression on the wire (~8-10% on 7B/9B)"
+}

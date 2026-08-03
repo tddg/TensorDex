@@ -147,3 +147,40 @@ Notes: resolve_ms 9–13 ms against the new manifest server (old
 prototype: 26–122 ms; old local SQLite: 250–380 ms). Cold ttfb_ms_p50
 tracks materialization queueing (24 ms SimPO → 2.4 s Tong) and is the
 cleanest per-run indicator of how hard the materializer worked.
+
+## 6. Hugging Face hub baseline (2026-08-03)
+
+Same models, downloaded from huggingface.co the way a real user does:
+`hf download <repo> --include "*.safetensors*"` — huggingface_hub
+1.26.0 with the hf_xet backend (parallel chunked transfer, HF's current
+default), fresh cache, same t3.xlarge client, 1 rep per model, one
+model per family. HF's weight files are byte-identical in size to our
+logical bytes, so e2e times are directly comparable. Raw numbers:
+`eval/results/hf_baseline.json`.
+
+| model | weights | HF e2e | HF goodput | NIC bytes | vs direct S3 | vs i4i cold | vs i4i warm |
+|---|---|---|---|---|---|---|---|
+| chat-doctor 3B | 1.56 GiB | 24.3 s | 66 MiB/s | 1.61 GiB | 2.0x slower | 2.5x slower | 7.0x slower |
+| Egida-DPO 7B | 14.19 GiB | 125.6 s | 116 MiB/s | 12.72 GiB | 1.12x slower | ~parity (0.97x) | 1.23x slower |
+| SimPO 9B | 17.21 GiB | 149.7 s | 118 MiB/s | 15.54 GiB | 1.06x slower | 1.17x slower | 1.17x slower |
+
+Reading:
+
+1. **TStore's serving tier beats the actual Hugging Face hub on this
+   client for every regime except one** (Egida cold, where they tie).
+   Warm serving wins 1.2x on big models and 7x on the 3B; even cold
+   demand-miss reconstruction matches or beats HF.
+2. **HF runs below the client NIC** (116–118 MiB/s vs the 136–143
+   sustained our warm path pins): CDN + Xet chunk assembly overhead
+   costs it ~15–20% of line rate on big models, and the single-file 3B
+   adapter gets only 66 MiB/s.
+3. **Xet's wire savings are real but modest**: NIC bytes ran 8–10%
+   under the written bytes on 7B/9B (chunk-level dedup/compression).
+   Compare: our store saves 35% at rest; our server path ships amp-1.0
+   logical bytes; our client-decode path ships 0.52–1.45x depending on
+   closure. HF's transfer dedup and our storage dedup are different
+   layers — a hub could do both.
+4. Protocol caveats: 1 rep, public CDN performance varies by time of
+   day and region; our numbers come from a private single-tenant tier —
+   this is a sanity anchor against the real-world incumbent, not a
+   controlled A/B.

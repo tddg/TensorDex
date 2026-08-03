@@ -272,7 +272,7 @@
   TensorDex encoder (SOSP'26) and the TDN delivery network.</p>
   <div class="meta-row">
     <span>2026-08-02 · updated 08-03</span>
-    <span>72 instrumented runs · all byte-exact (XXH3 per tensor)</span>
+    <span>72 instrumented runs · all byte-exact (XXH3 per tensor) · +3 Hugging Face baseline pulls</span>
     <span>client: t3.xlarge · us-east-1</span>
     <span>serving: i4i.2xlarge · NVMe · same VPC</span>
     <span>9 models · 3 families · 106.3 GB logical</span>
@@ -587,6 +587,7 @@
       <span class="key"><span class="swatch" style="background:var(--s3)"></span>cold · i4i</span>
       <span class="key"><span class="swatch" style="background:var(--s4); opacity:.45"></span>warm · t3 proto</span>
       <span class="key"><span class="swatch" style="background:var(--s4)"></span>warm · i4i</span>
+      <span class="key"><span class="swatch" style="background:var(--s2)"></span>Hugging Face hub (one model per family, 2026-08-03)</span>
     </div>
     <div class="panel">
       <div class="panel-name">llama-3.2-3B <small>· 1.7 GB · scale 0–45 s</small></div>
@@ -595,6 +596,7 @@
       <div class="brow"><span class="rlabel">cold · i4i</span><div class="track" data-tip="NEW cold — 28.4 s median, but a 9.9–43.2 s spread across three near-identical models: latency-bound small tensors, not bandwidth (see below)."><div class="bar s3" style="width:63.1%"></div><span class="val">28.4 s (9.9–43.2)</span></div></div>
       <div class="brow"><span class="rlabel">warm · t3 proto</span><div class="track" data-tip="OLD warm — 3.9 s from the server's page cache, loopback."><div class="bar s4 old" style="width:8.7%"></div><span class="val">3.9 s</span></div></div>
       <div class="brow"><span class="rlabel">warm · i4i</span><div class="track" data-tip="NEW warm — 3.5 s over a real network hop at 432–459 MB/s (NIC burst)."><div class="bar s4" style="width:7.8%"></div><span class="val">3.5 s</span></div></div>
+      <div class="brow"><span class="rlabel">Hugging Face</span><div class="track" data-tip="hf download of chat-doctor (the same 1.56 GiB adapter file), hf_xet backend, same client — 24.3 s at 66 MiB/s. 7× slower than our warm path, 2.5× slower than our cold."><div class="bar s2" style="width:54%"></div><span class="val">24.3 s (chat-doctor)</span></div></div>
     </div>
     <div class="panel">
       <div class="panel-name">Qwen2.5-7B <small>· 15.2 GB · scale 0–290 s</small></div>
@@ -603,6 +605,7 @@
       <div class="brow"><span class="rlabel">cold · i4i</span><div class="track" data-tip="NEW cold — 129.2 s: 2.1× faster than the prototype, 1.14× of direct S3."><div class="bar s3" style="width:44.6%"></div><span class="val">129.2 s</span></div></div>
       <div class="brow"><span class="rlabel">warm · t3 proto</span><div class="track" data-tip="OLD warm — 204.4 s, EBS-bound at ~77 MB/s: slower than S3."><div class="bar s4 old" style="width:70.5%"></div><span class="val">204.4 s</span></div></div>
       <div class="brow"><span class="rlabel">warm · i4i</span><div class="track" data-tip="NEW warm — 102.3 s at 162 MB/s peaks: pinned by the CLIENT's NIC, and still beats direct S3 by 1.1×."><div class="bar s4" style="width:35.3%"></div><span class="val">102.3 s ← beats direct</span></div></div>
+      <div class="brow"><span class="rlabel">Hugging Face</span><div class="track" data-tip="hf download of Egida-DPO (14.19 GiB), hf_xet backend — 125.6 s at 116 MiB/s; Xet moved only 12.7 GiB on the wire (~10% chunk-dedup saving). Ties our cold, 1.23× slower than our warm."><div class="bar s2" style="width:43.3%"></div><span class="val">125.6 s (Egida-DPO)</span></div></div>
     </div>
     <div class="panel">
       <div class="panel-name">gemma-2-9B <small>· 18.5 GB · scale 0–420 s</small></div>
@@ -611,7 +614,29 @@
       <div class="brow"><span class="rlabel">cold · i4i</span><div class="track" data-tip="NEW cold — 137.4 s: 2.9× faster than the prototype, at direct-S3 parity. Woona's 26.9 GB depth-2 closure materialized at 128 MB/s. SimPO materialized faster than the client NIC drains: its cold equals its warm."><div class="bar s3" style="width:32.7%"></div><span class="val">137.4 s ← parity</span></div></div>
       <div class="brow"><span class="rlabel">warm · t3 proto</span><div class="track" data-tip="OLD warm — 258.4 s, 1.8× slower than direct S3. The finding that motivated the i4i."><div class="bar s4 old" style="width:61.5%"></div><span class="val">258.4 s</span></div></div>
       <div class="brow"><span class="rlabel">warm · i4i</span><div class="track" data-tip="NEW warm — 128.1 s at 136–143 MB/s: the t3 client's sustained NIC rate. The cache tier is no longer the limiter."><div class="bar s4" style="width:30.5%"></div><span class="val">128.1 s ← beats direct</span></div></div>
+      <div class="brow"><span class="rlabel">Hugging Face</span><div class="track" data-tip="hf download of SimPO (17.21 GiB), hf_xet backend — 149.7 s at 118 MiB/s; 15.5 GiB on the wire. 1.17× slower than both our cold and warm paths."><div class="bar s2" style="width:35.6%"></div><span class="val">149.7 s (SimPO)</span></div></div>
     </div>
+  </div>
+
+  <h3>Anchor against the incumbent: the same models from huggingface.co</h3>
+  <div class="prose">
+    <p>Measured 2026-08-03, one model per family, from the same t3 client:
+    <code>hf download --include "*.safetensors*"</code> with huggingface_hub
+    1.26.0 and the <strong>hf_xet</strong> backend (HF's current default —
+    parallel chunked transfer with chunk-level dedup), fresh cache, weight
+    files byte-identical in size to our logical bytes. Three observations:
+    <strong>(1)</strong> the i4i tier beats the real Hugging Face hub in every
+    measured regime except one tie (Egida cold): warm wins 1.2× on big models
+    and 7× on the 3B, and even cold demand-miss reconstruction matches or
+    beats it. <strong>(2)</strong> HF runs below this client's NIC — 116–118
+    MiB/s on the 7B/9B against the 136–143 our warm path pins, and just
+    66 MiB/s on the single-file 3B adapter. <strong>(3)</strong> Xet's wire
+    dedup is real but modest here: 8–10% fewer bytes on the wire than
+    written to disk, vs the 35% our store saves at rest — transfer-layer and
+    storage-layer dedup are different layers, and a hub could stack both.
+    Caveats: single rep against a public CDN whose performance varies; a
+    sanity anchor, not a controlled A/B. Raw numbers:
+    <code>eval/results/hf_baseline.json</code>.</p>
   </div>
 
   <h3>What moved, and where the bottleneck went</h3>
@@ -1120,7 +1145,10 @@
   in-band. Server cold protocol — t3 campaign: cache cleared between models;
   i4i campaign: one full clear then natural first touch, demand-miss,
   client-parallel ×10, with per-run pre-cached-bytes annotations from the
-  closure-overlap discovery (§2b). Medians over 2 reps.</p>
+  closure-overlap discovery (§2b). Medians over 2 reps. Hugging Face
+  baseline: hf download (huggingface_hub 1.26.0, hf_xet), weights only,
+  fresh cache, 1 rep per model, one model per family, same client, same
+  day — raw numbers in eval/results/hf_baseline.json.</p>
 </footer>
 
 </div>
