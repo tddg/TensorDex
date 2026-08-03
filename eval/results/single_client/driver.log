@@ -1,0 +1,46 @@
+resume: 6 completed runs will be skipped
+[0] tensordex  princeton-nlp/gemma-2-9b-it-SimPO        skipped (done)
+[0] tensordex_c princeton-nlp/gemma-2-9b-it-SimPO        skipped (done)
+[0] tensordex_c BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1 skipped (done)
+[0] tensordex  HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO   skipped (done)
+[0] tensordex  BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1 skipped (done)
+[0] tensordex  KPEP/krx-qwen-2.5-7b-v1.4.4              skipped (done)
+exit=137
+resume: 1 completed runs will be skipped
+[0] tensordex  princeton-nlp/gemma-2-9b-it-SimPO          140.96s  ok
+[0] tensordex_c princeton-nlp/gemma-2-9b-it-SimPO          141.58s  ok
+[0] tensordex_c BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1    21.85s  ok
+[0] tensordex  HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO     111.74s  ok
+[0] tensordex  BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1    24.26s  ok
+[0] tensordex  KPEP/krx-qwen-2.5-7b-v1.4.4                114.70s  ok
+[0] tensordex_c AlexBefest/WoonaV1.2-9b                  skipped (done)
+[0] tensordex_c KPEP/krx-qwen-2.5-7b-v1.4.4                128.01s  ok
+[0] tensordex_c mlfoundations-dev/hp_ablations_qwen_adambeta2_0.95_dcftv1.2   146.72s  ok
+[0] tensordex  TongZheng1999/gemma-2-9b-it-star-truth_table-OP-final_1-2-3Rounds-iter-1   157.14s  ok
+[0] tensordex  AhmedSSoliman/llama-3.2-3b-chat-doctor      12.16s  ok
+[0] tensordex  mlfoundations-dev/hp_ablations_qwen_adambeta2_0.95_dcftv1.2   115.49s  ok
+[0] tensordex_c Gabbar01/llama-3.2-3b-GSOC-DATASET          18.47s  ok
+[0] tensordex_c TongZheng1999/gemma-2-9b-it-star-truth_table-OP-final_1-2-3Rounds-iter-1   155.57s  ok
+[0] tensordex  AlexBefest/WoonaV1.2-9b                    140.11s  ok
+[0] tensordex_c HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO     138.37s  ok
+[0] tensordex_c AhmedSSoliman/llama-3.2-3b-chat-doctor      15.63s  ok
+[0] tensordex  Gabbar01/llama-3.2-3b-GSOC-DATASET          11.70s  ok
+[1] tensordex  mlfoundations-dev/hp_ablations_qwen_adambeta2_0.95_dcftv1.2   110.74s  ok
+[1] tensordex_c TongZheng1999/gemma-2-9b-it-star-truth_table-OP-final_1-2-3Rounds-iter-1   160.48s  ok
+[1] tensordex_c mlfoundations-dev/hp_ablations_qwen_adambeta2_0.95_dcftv1.2   149.55s  ok
+[1] tensordex_c HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO     138.32s  ok
+[1] tensordex  TongZheng1999/gemma-2-9b-it-star-truth_table-OP-final_1-2-3Rounds-iter-1   153.34s  ok
+[1] tensordex  AhmedSSoliman/llama-3.2-3b-chat-doctor      11.95s  ok
+[1] tensordex_c princeton-nlp/gemma-2-9b-it-SimPO          147.58s  ok
+[1] tensordex  BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1    22.73s  ok
+[1] tensordex_c AlexBefest/WoonaV1.2-9b                    175.33s  ok
+[1] tensordex_c Gabbar01/llama-3.2-3b-GSOC-DATASET          19.07s  ok
+[1] tensordex_c AhmedSSoliman/llama-3.2-3b-chat-doctor      11.44s  ok
+[1] tensordex_c BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1    21.25s  ok
+[1] tensordex  HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO     113.09s  ok
+[1] tensordex  KPEP/krx-qwen-2.5-7b-v1.4.4                111.77s  ok
+[1] tensordex  Gabbar01/llama-3.2-3b-GSOC-DATASET          13.03s  ok
+[1] tensordex  princeton-nlp/gemma-2-9b-it-SimPO          141.66s  ok
+[1] tensordex_c KPEP/krx-qwen-2.5-7b-v1.4.4                119.54s  ok
+[1] tensordex  AlexBefest/WoonaV1.2-9b                    139.50s  ok
+exit=0

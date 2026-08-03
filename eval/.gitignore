@@ -1,0 +1,4 @@
+# Local data — regenerable from S3 (see HANDOFF.md / PROGRESS.md §3):
+# hub catalogs (master.db copies), inventory dumps, reconstruction cache.
+raw/
+__pycache__/

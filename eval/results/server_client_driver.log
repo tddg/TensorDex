@@ -1,0 +1,54 @@
+cache cleared: {"cleared": 0}
+== /home/ubuntu/TensorDex/.venv/bin/python -u eval/scripts/run_single.py --models AhmedSSoliman/llama-3.2-3b-chat-doctor --systems tensordex_srv --reps 2 --seed 42 --workers 10 --metadata-url http://127.0.0.1:8701 --cache-url http://127.0.0.1:8702 --out eval/results/server_client
+[0] tensordex_srv AhmedSSoliman/llama-3.2-3b-chat-doctor      21.18s  FAILED: TypeError("argument 'bytes': 'bytearray' object cannot be converted to 'PyBytes'")
+[1] tensordex_srv AhmedSSoliman/llama-3.2-3b-chat-doctor       1.32s  FAILED: TypeError("argument 'bytes': 'bytearray' object cannot be converted to 'PyBytes'")
+cache cleared: {"cleared": 201}
+== /home/ubuntu/TensorDex/.venv/bin/python -u eval/scripts/run_single.py --models Gabbar01/llama-3.2-3b-GSOC-DATASET --systems tensordex_srv --reps 2 --seed 42 --workers 10 --metadata-url http://127.0.0.1:8701 --cache-url http://127.0.0.1:8702 --out eval/results/server_client
+[0] tensordex_srv Gabbar01/llama-3.2-3b-GSOC-DATASET          18.23s  FAILED: TypeError("argument 'bytes': 'bytearray' object cannot be converted to 'PyBytes'")
+[1] tensordex_srv Gabbar01/llama-3.2-3b-GSOC-DATASET           1.29s  FAILED: TypeError("argument 'bytes': 'bytearray' object cannot be converted to 'PyBytes'")
+cache cleared: {"cleared": 203}
+== /home/ubuntu/TensorDex/.venv/bin/python -u eval/scripts/run_single.py --models BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1 --systems tensordex_srv --reps 2 --seed 42 --workers 10 --metadata-url http://127.0.0.1:8701 --cache-url http://127.0.0.1:8702 --out eval/results/server_client
+[0] tensordex_srv BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1    37.04s  FAILED: TypeError("argument 'bytes': 'bytearray' object cannot be converted to 'PyBytes'")
+[1] tensordex_srv BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1     2.45s  FAILED: TypeError("argument 'bytes': 'bytearray' object cannot be converted to 'PyBytes'")
+cache cleared: {"cleared": 200}
+== /home/ubuntu/TensorDex/.venv/bin/python -u eval/scripts/run_single.py --models KPEP/krx-qwen-2.5-7b-v1.4.4 --systems tensordex_srv --reps 2 --seed 42 --workers 10 --metadata-url http://127.0.0.1:8701 --cache-url http://127.0.0.1:8702 --out eval/results/server_client
+driver failed for KPEP/krx-qwen-2.5-7b-v1.4.4 (rc=-9)
+exit=247
+cache cleared: {"cleared": 0}
+== /home/ubuntu/TensorDex/.venv/bin/python -u eval/scripts/run_single.py --models Gabbar01/llama-3.2-3b-GSOC-DATASET --systems tensordex_srv --reps 2 --seed 42 --workers 10 --metadata-url http://127.0.0.1:8701 --cache-url http://127.0.0.1:8702 --out eval/results/server_client
+[0] tensordex_srv Gabbar01/llama-3.2-3b-GSOC-DATASET          23.70s  ok
+[1] tensordex_srv Gabbar01/llama-3.2-3b-GSOC-DATASET           3.94s  ok
+cache cleared: {"cleared": 203}
+== /home/ubuntu/TensorDex/.venv/bin/python -u eval/scripts/run_single.py --models BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1 --systems tensordex_srv --reps 2 --seed 42 --workers 10 --metadata-url http://127.0.0.1:8701 --cache-url http://127.0.0.1:8702 --out eval/results/server_client
+[0] tensordex_srv BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1    38.51s  ok
+[1] tensordex_srv BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1     7.07s  ok
+cache cleared: {"cleared": 200}
+== /home/ubuntu/TensorDex/.venv/bin/python -u eval/scripts/run_single.py --models KPEP/krx-qwen-2.5-7b-v1.4.4 --systems tensordex_srv --reps 2 --seed 42 --workers 10 --metadata-url http://127.0.0.1:8701 --cache-url http://127.0.0.1:8702 --out eval/results/server_client
+driver failed for KPEP/krx-qwen-2.5-7b-v1.4.4 (rc=-9)
+exit=247
+cache cleared: {"cleared": 196}
+== /home/ubuntu/TensorDex/.venv/bin/python -u eval/scripts/run_single.py --models KPEP/krx-qwen-2.5-7b-v1.4.4 --systems tensordex_srv --reps 2 --seed 42 --workers 10 --metadata-url http://127.0.0.1:8701 --cache-url http://127.0.0.1:8702 --out eval/results/server_client
+[0] tensordex_srv KPEP/krx-qwen-2.5-7b-v1.4.4                276.74s  ok
+[1] tensordex_srv KPEP/krx-qwen-2.5-7b-v1.4.4                198.25s  ok
+cache cleared: {"cleared": 197}
+== /home/ubuntu/TensorDex/.venv/bin/python -u eval/scripts/run_single.py --models HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO --systems tensordex_srv --reps 2 --seed 42 --workers 10 --metadata-url http://127.0.0.1:8701 --cache-url http://127.0.0.1:8702 --out eval/results/server_client
+[0] tensordex_srv HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO     259.53s  ok
+[1] tensordex_srv HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO     204.38s  ok
+cache cleared: {"cleared": 198}
+== /home/ubuntu/TensorDex/.venv/bin/python -u eval/scripts/run_single.py --models mlfoundations-dev/hp_ablations_qwen_adambeta2_0.95_dcftv1.2 --systems tensordex_srv --reps 2 --seed 42 --workers 10 --metadata-url http://127.0.0.1:8701 --cache-url http://127.0.0.1:8702 --out eval/results/server_client
+[0] tensordex_srv mlfoundations-dev/hp_ablations_qwen_adambeta2_0.95_dcftv1.2   290.62s  ok
+[1] tensordex_srv mlfoundations-dev/hp_ablations_qwen_adambeta2_0.95_dcftv1.2   205.14s  ok
+cache cleared: {"cleared": 213}
+== /home/ubuntu/TensorDex/.venv/bin/python -u eval/scripts/run_single.py --models princeton-nlp/gemma-2-9b-it-SimPO --systems tensordex_srv --reps 2 --seed 42 --workers 10 --metadata-url http://127.0.0.1:8701 --cache-url http://127.0.0.1:8702 --out eval/results/server_client
+[0] tensordex_srv princeton-nlp/gemma-2-9b-it-SimPO          299.36s  ok
+[1] tensordex_srv princeton-nlp/gemma-2-9b-it-SimPO          250.69s  ok
+cache cleared: {"cleared": 215}
+== /home/ubuntu/TensorDex/.venv/bin/python -u eval/scripts/run_single.py --models TongZheng1999/gemma-2-9b-it-star-truth_table-OP-final_1-2-3Rounds-iter-1 --systems tensordex_srv --reps 2 --seed 42 --workers 10 --metadata-url http://127.0.0.1:8701 --cache-url http://127.0.0.1:8702 --out eval/results/server_client
+[0] tensordex_srv TongZheng1999/gemma-2-9b-it-star-truth_table-OP-final_1-2-3Rounds-iter-1   397.84s  ok
+[1] tensordex_srv TongZheng1999/gemma-2-9b-it-star-truth_table-OP-final_1-2-3Rounds-iter-1   259.97s  ok
+cache cleared: {"cleared": 243}
+== /home/ubuntu/TensorDex/.venv/bin/python -u eval/scripts/run_single.py --models AlexBefest/WoonaV1.2-9b --systems tensordex_srv --reps 2 --seed 42 --workers 10 --metadata-url http://127.0.0.1:8701 --cache-url http://127.0.0.1:8702 --out eval/results/server_client
+[0] tensordex_srv AlexBefest/WoonaV1.2-9b                    415.45s  ok
+[1] tensordex_srv AlexBefest/WoonaV1.2-9b                    258.36s  ok
+cache cleared: {"cleared": 246}
+exit=0

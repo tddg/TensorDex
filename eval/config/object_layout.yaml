@@ -1,0 +1,28 @@
+# S3 object layout — confirmed by inventory on 2026-08-01.
+bucket: tensor-tingfeng
+region: us-east-1
+root_prefix: tensordb/
+
+layouts:
+  tensordex:
+    blob_prefix: tensordb            # objects: tensordb/blobs/{id[:2]}/{id}.safetensors
+    manifest_prefix: tensordb/master.db  # full catalog (tensors/model_mappings/model_meta)
+    metadata_dir: eval/raw/hub_live  # local copy of master.db (1.35 GB)
+    # NOTE: master.db has NO tensor_deltas table — the live store is
+    # dedup-only raw blobs. Delta layouts must be constructed before the
+    # delta-retrieval experiments can run.
+  tensordex_c:                       # delta-compressed hub (built 2026-08-01)
+    blob_prefix: compressed_eval     # objects: compressed_eval/blobs/{id[:2]}/{id}.safetensors
+    manifest_prefix: compressed_eval/master.db  # 32 MB, includes tensor_deltas
+    metadata_dir: eval/raw/hub_compressed
+    # tensors.size_bytes here is the STORED (compressed) size; logical
+    # sizes come from shape x dtype.
+  zipnn:
+    model_prefix: null               # ABSENT from bucket — must be generated
+  raw:
+    model_prefix: null               # ABSENT from bucket — must be generated
+
+# Non-benchmark content also present under tensordb/:
+#   master.db + timestamped .bak files (catalog backups)
+#   checkpoint/{master.db 7.5GB, results.db}   (larger snapshot)
+#   backups/node_*_metadata.db + worker tarballs (distributed crawl state)

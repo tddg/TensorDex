@@ -1,0 +1,2 @@
+system,model_id,n_runs,n_ok,e2e_ms_p50,e2e_ms_p90,e2e_ms_p95,e2e_ms_p99,e2e_ms_min,e2e_ms_max,e2e_ms_cv,logical_bytes,s3_bytes_mean,gets_mean,read_amplification
+tensordex,AhmedSSoliman/llama-3.2-3b-chat-doctor,1,1,14045.49038,14045.49038,14045.49038,14045.49038,14045.49038,14045.49038,,1673289728,885363760.0,393.0,0.5291156368109851
