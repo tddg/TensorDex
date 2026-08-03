@@ -29,6 +29,7 @@ import concurrent.futures as cf
 import os
 import threading
 import time
+import uuid
 
 from .blob import parse_safetensors_bytes
 
@@ -171,8 +172,12 @@ class ClosurePipeline:
         if not entries:
             return stats
         order, refcount, by_tid = dfs_order(entries)
-        decoded = BaseStore(spill_dir or self.spill_dir,
-                            ram_budget=self.base_ram_budget)
+        # Unique subdir per run: concurrent runs may spill the same
+        # shared base tid, and a shared path lets one run unlink a
+        # spill file another still needs.
+        decoded = BaseStore(
+            os.path.join(spill_dir or self.spill_dir, uuid.uuid4().hex),
+            ram_budget=self.base_ram_budget)
         budget = {"bytes": 0, "head": 0, "lock": threading.Lock(),
                   "cv": threading.Condition()}
         # External bases (outside `entries`) are fetched via base_lookup

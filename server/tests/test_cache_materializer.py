@@ -18,6 +18,7 @@ import threading
 import time
 
 import pytest
+import requests
 import torch
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -215,6 +216,77 @@ def test_accel_redirect_mode(mat):
     assert r.status_code == 200
     assert r.headers["x-accel-redirect"] == f"/_cache/{tid[:2]}/{tid}"
     assert not r.content  # nginx does the send
+    # Regression: an explicit Content-Length of the *file* on this
+    # empty reply makes uvicorn abort the connection mid-response
+    # (837 broken keepalives in the 2026-08-03 client run).
+    assert int(r.headers.get("content-length", 0)) == 0
+
+
+def test_error_paths_502_and_404(mat):
+    chain, objects, _ = synth_chain(depth=0)
+    wire(mat, objects, [chain])
+    c = client_of(mat)
+
+    class FakeResp:
+        status_code = 404
+
+    def missing(tid):
+        raise requests.HTTPError(response=FakeResp())
+
+    mat.fetch_closure = missing
+    assert c.get(f"/v1/tensor/{'0' * 32}").status_code == 404
+
+    def boom(tid):
+        raise RuntimeError("metadata down")
+
+    mat.fetch_closure = boom
+    r = c.get(f"/v1/tensor/{'1' * 32}")
+    assert r.status_code == 502  # upstream failure, not a server bug
+
+
+def test_concurrent_chains_share_spilled_base(mat, monkeypatch):
+    """Regression for the 2026-08-03 FileNotFoundError: two concurrent
+    chains through one shared base must not collide on spill files.
+    Tiny base-RAM budget forces every decoded base to spill."""
+    monkeypatch.setattr(mat, "DEMAND_BASE_RAM", 1)
+    chain, objects, expect = synth_chain(depth=1)
+    root = chain[1]
+    n_el = 4096
+    root_raw = expect[root["tid"]]
+    # Second delta off the same root.
+    torch.manual_seed(99)
+    sib_raw = (torch.frombuffer(bytearray(root_raw), dtype=torch.float32)
+               + torch.randn(n_el) * 1e-3).numpy().tobytes()
+    sib_tid = _ops.content_hash(sib_raw)
+    payload = bytes(_ops.compress_tensorx_rust(sib_raw, root_raw, ITEM, 3))
+    objects[key_of(sib_tid)] = make_blob(
+        "t", payload, n_el, {"codec": "tensorx", "item_size": ITEM,
+                             "base_tensor_id": root["tid"]})
+    sib = {"tid": sib_tid, "key": key_of(sib_tid),
+           "stored_bytes": len(payload), "logical_bytes": len(sib_raw),
+           "codec": "tensorx", "base_id": root["tid"], "depth": 1}
+    wire(mat, objects, [chain, [sib, root]])
+    c = client_of(mat)
+
+    results = {}
+
+    def pull(tid):
+        results[tid] = c.get(f"/v1/tensor/{tid}")
+
+    for _round in range(5):  # a few rounds to give the race room
+        import shutil
+        shutil.rmtree(mat.cache.root, ignore_errors=True)
+        mat.cache.__init__(mat.cache.root)
+        threads = [threading.Thread(target=pull, args=(t,))
+                   for t in (chain[0]["tid"], sib_tid)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert results[chain[0]["tid"]].status_code == 200
+        assert results[sib_tid].status_code == 200
+        assert results[chain[0]["tid"]].content == expect[chain[0]["tid"]]
+        assert results[sib_tid].content == sib_raw
 
 
 def test_warm_endpoint(mat):

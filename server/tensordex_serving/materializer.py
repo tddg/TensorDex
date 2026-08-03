@@ -212,23 +212,42 @@ def metrics():
 def get_tensor(tid: str, request: Request):
     t0 = time.perf_counter_ns()
     stats: dict = {}
-    try:
-        path = materialize(tid, stats)
-    except Exception as e:  # noqa: BLE001
+    # Two attempts: an entry can vanish between materialize and stat
+    # (eviction race); the retry re-materializes it.
+    for _attempt in (1, 2):
+        try:
+            path = materialize(tid, stats)
+            size = os.path.getsize(path)
+            break
+        except FileNotFoundError:
+            continue
+        except Exception as e:  # noqa: BLE001
+            status = (404 if isinstance(e, requests.HTTPError)
+                      and e.response is not None
+                      and e.response.status_code == 404 else 502)
+            _count("tensor_error")
+            _log({"ts_ns": time.perf_counter_ns(), "tid": tid,
+                  "status": status, "error": repr(e),
+                  "duration_ms": (time.perf_counter_ns() - t0) / 1e6})
+            return JSONResponse({"error": repr(e)}, status_code=status)
+    else:
         _count("tensor_error")
-        _log({"ts_ns": time.perf_counter_ns(), "tid": tid, "status": 500,
-              "error": repr(e),
+        _log({"ts_ns": time.perf_counter_ns(), "tid": tid, "status": 502,
+              "error": "entry vanished twice (eviction race?)",
               "duration_ms": (time.perf_counter_ns() - t0) / 1e6})
-        return JSONResponse({"error": repr(e)}, status_code=500)
+        return JSONResponse({"error": "cache entry unavailable"},
+                            status_code=502)
     _count("tensor_hit" if stats.get("cache_hit") else "tensor_miss")
-    size = os.path.getsize(path)
     _log({"ts_ns": time.perf_counter_ns(), "tid": tid, "status": 200,
           "serve_bytes": size,
           "duration_ms": (time.perf_counter_ns() - t0) / 1e6, **stats})
-    headers = {"ETag": tid, "Content-Length": str(size),
+    headers = {"ETag": tid,
                "X-Cache": "hit" if stats.get("cache_hit") else "miss"}
     if request.headers.get("x-accel-expected"):
-        # nginx does the send: zero bytes cross this process.
+        # nginx does the send: zero bytes cross this process. No
+        # Content-Length here — the body is empty and nginx stats the
+        # file itself (an explicit length on an empty reply makes
+        # uvicorn abort the connection mid-response).
         headers["X-Accel-Redirect"] = \
             f"/_cache/{urllib.parse.quote(cache.rel_path(tid))}"
         return Response(status_code=200, headers=headers)
