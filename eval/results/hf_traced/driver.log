@@ -1,0 +1,39 @@
+AhmedSSoliman/llama-3.2-3b-chat-doctor rep1: 1.56 GiB in 9.8s = 163 MiB/s [hf-own-cdn]
+AhmedSSoliman/llama-3.2-3b-chat-doctor rep2: 1.56 GiB in 8.4s = 189 MiB/s [hf-own-cdn]
+Gabbar01/llama-3.2-3b-GSOC-DATASET rep1: 1.56 GiB in 11.6s = 138 MiB/s [hf-own-cdn]
+BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1 rep1: 1.65 GiB in 10.5s = 160 MiB/s [hf-own-cdn]
+KPEP/krx-qwen-2.5-7b-v1.4.4 rep1: 14.19 GiB in 82.3s = 177 MiB/s [hf-own-cdn]
+HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO rep1: 14.19 GiB in 69.3s = 210 MiB/s [hf-own-cdn]
+HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO rep2: 14.19 GiB in 65.1s = 223 MiB/s [hf-own-cdn]
+Traceback (most recent call last):
+  File "/home/ubuntu/TensorDex/eval/scripts/hf_trace_download.py", line 160, in <module>
+    main()
+  File "/home/ubuntu/TensorDex/eval/scripts/hf_trace_download.py", line 126, in main
+    files = list_weights(repo)
+            ^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/TensorDex/eval/scripts/hf_trace_download.py", line 44, in list_weights
+    with urllib.request.urlopen(url, timeout=30) as r:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/urllib/request.py", line 216, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/urllib/request.py", line 525, in open
+    response = meth(req, response)
+               ^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/urllib/request.py", line 634, in http_response
+    response = self.parent.error(
+               ^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/urllib/request.py", line 563, in error
+    return self._call_chain(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/urllib/request.py", line 496, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/home/ubuntu/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/urllib/request.py", line 643, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 401: Unauthorized
+mlfoundations-dev/hp_ablations_qwen_adambeta2_0.95_dcftv1.2: SKIPPED (HTTP Error 401: Unauthorized)
+princeton-nlp/gemma-2-9b-it-SimPO rep1: 17.21 GiB in 74.7s = 236 MiB/s [hf-own-cdn]
+princeton-nlp/gemma-2-9b-it-SimPO rep2: 17.21 GiB in 85.3s = 207 MiB/s [hf-own-cdn]
+TongZheng1999/gemma-2-9b-it-star-truth_table-OP-final_1-2-3Rounds-iter-1 rep1: 17.21 GiB in 81.5s = 216 MiB/s [hf-own-cdn]
+AlexBefest/WoonaV1.2-9b rep1: 17.21 GiB in 82.6s = 213 MiB/s [hf-own-cdn]

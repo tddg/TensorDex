@@ -40,20 +40,25 @@ client streams against the fixed keepalive path.
 
 ### NEW — i4i deployment (dedicated server, NVMe, over network)
 
-| model | logical GB | srv cold | srv warm | cold pre-cached bytes |
-|---|---|---|---|---|
-| AhmedSSoliman/llama-3.2-3b-chat-doctor | 1.67 | 9.9 | 3.5 | 0.3% |
-| Gabbar01/llama-3.2-3b-GSOC-DATASET | 1.67 | 28.4 | 3.5 | 0% (ran first) |
-| BanglaLLM/BanglaLLama-3.2-3b | 1.77 | 43.2 | 6.2 | 0.2% |
-| KPEP/krx-qwen-2.5-7b-v1.4.4 | 15.23 | 117.4 | 102.3 | 2.5% |
-| HPAI-BSC/Qwen2.5-7B-Egida-DPO | 15.23 | 129.2 | 101.8 | 2.1% |
-| mlfoundations-dev/hp_ablations_qwen | 15.23 | 156.3 | 103.0 | 0.2% |
-| princeton-nlp/gemma-2-9b-it-SimPO | 18.48 | 128.3 | 127.9 | 7.2% |
-| TongZheng1999/gemma-2-9b-star | 18.48 | 186.0 | 128.1 | 0.3% |
-| AlexBefest/WoonaV1.2-9b | 18.48 | 137.4 | 129.8 | 0.0% |
+| model | logical GB | srv cold | srv warm | cold pre-cached bytes | HF traced‡ |
+|---|---|---|---|---|---|
+| AhmedSSoliman/llama-3.2-3b-chat-doctor | 1.67 | 9.9 | 3.5 | 0.3% | 9.8 |
+| Gabbar01/llama-3.2-3b-GSOC-DATASET | 1.67 | 28.4 | 3.5 | 0% (ran first) | 11.6 |
+| BanglaLLM/BanglaLLama-3.2-3b | 1.77 | 43.2 | 6.2 | 0.2% | 10.5 |
+| KPEP/krx-qwen-2.5-7b-v1.4.4 | 15.23 | 117.4 | 102.3 | 2.5% | 82.3 |
+| HPAI-BSC/Qwen2.5-7B-Egida-DPO | 15.23 | 129.2 | 101.8 | 2.1% | 69.3 |
+| mlfoundations-dev/hp_ablations_qwen | 15.23 | 156.3 | 103.0 | 0.2% | gated (401) |
+| princeton-nlp/gemma-2-9b-it-SimPO | 18.48 | 128.3 | 127.9 | 7.2% | 74.7 |
+| TongZheng1999/gemma-2-9b-star | 18.48 | 186.0 | 128.1 | 0.3% | 81.5 |
+| AlexBefest/WoonaV1.2-9b | 18.48 | 137.4 | 129.8 | 0.0% | 82.6 |
 
 (pre-cached bytes: share of served bytes that were already resident from
-earlier runs' shared ancestors, measured from client TTFB<50 ms — see §4.)
+earlier runs' shared ancestors, measured from client TTFB<50 ms — see §4.
+‡ HF traced = huggingface.co download, 8 parallel range-streams to
+/dev/null — NO hash verify, NO disk write, so NOT directly comparable to
+the harness columns, which verify every tensor and write real shards;
+see §6 for the like-for-like analysis. mlfoundations is gated/private on
+HF (anonymous 401) — our hub serves it; HF cannot.)
 
 ### Family medians, side by side
 
@@ -78,11 +83,14 @@ unchanged by this campaign; included for ratio context only.)
    wants: reconstruction fully hidden behind the wire.
 2. **Warm: 2.0x faster on big models, and the bottleneck moved OFF the
    server.** Old warm was EBS-bound at ~75 MB/s for models too big for
-   page cache. New warm pins every big model at 136–143 MB/s = the
-   CLIENT NIC sustained rate (3B models, running during burst credits,
-   hit 432–459 MB/s; on-box smoke hit 878 MB/s). The cache tier is no
-   longer measurable from a t3 client — finding its ceiling needs
-   Stage 3 (concurrent clients) or a bigger-NIC client.
+   page cache. New warm pins every big model at 136–143 MB/s.
+   *ATTRIBUTION CORRECTED (§6b): this wall is the CLIENT's hash-verify
+   + EBS-shard-write pipeline, NOT the NIC* — a transport-only probe
+   received 590 MiB/s from the cache in the same window. 3B models
+   escaped it because their writes fit page cache (432–459 MB/s);
+   on-box smoke hit 878 MB/s. Either way the cache tier is no longer
+   the limiter from a t3 client — finding its ceiling needs Stage 3
+   (concurrent clients) or a beefier client.
 3. **llama-family cold is the one soft spot: 9.9 / 28.4 / 43.2 s across
    three near-identical 1.7 GB models** (vs 12.4 s direct S3). All
    three are >99% miss-served, so this is NOT cache pollution. The 3B
@@ -148,7 +156,56 @@ prototype: 26–122 ms; old local SQLite: 250–380 ms). Cold ttfb_ms_p50
 tracks materialization queueing (24 ms SimPO → 2.4 s Tong) and is the
 cleanest per-run indicator of how hard the materializer worked.
 
-## 6. Hugging Face hub baseline (2026-08-03)
+## 6. Hugging Face hub baseline (2026-08-03) — CLI, traced, and provenance
+
+### 6a. Where HF's bytes actually come from
+
+Traced 449 data requests across all accessible models
+(`eval/scripts/hf_trace_download.py`, raw JSONL in
+`eval/results/hf_traced/`): **100% of data bytes were served by
+`us.aws.cdn.hf.co` — Hugging Face's OWN CDN / Xet-bridge fleet**
+(`x-hf-cdn-pop: aws-us-east-1`), NOT CloudFront (no cloudfront.net
+CNAME, no Via/X-Cache headers; plain A records into EC2 us-east-1) and
+NOT direct S3 (the S3 origin is hidden behind the bridge). Only the
+`huggingface.co` control-plane hop is CloudFront-fronted, and every one
+of its 302 redirects was `X-Cache: Miss from cloudfront` (per-request
+signed URLs are uncacheable by design; POP IAD55).
+
+Per-stream behavior of the bridge: TTFB p50 658 ms / p95 1.2 s;
+throughput p50 28 MiB/s per TCP stream (p5 18, p95 63) — all apparent
+HF speed comes from client-side parallelism. Edge warmth is mild:
+re-fetching the same model immediately improves TTFB 640→498 ms and
+per-stream rate 28→32 MiB/s (~10–20%), consistent with a large
+always-warm regional fleet rather than a thin edge cache over S3.
+One access finding: `mlfoundations-dev/hp_ablations_qwen...` is
+gated/private on HF (anonymous 401) — our hub serves it.
+
+### 6b. The client-side pipeline confound, and the like-for-like probe
+
+The traced numbers (69–83 s on 7B/9B, 163–236 MiB/s) look faster than
+our harness's i4i-warm numbers (102–130 s) — but the tracer streams to
+/dev/null with no hash verify and no disk write, while every harness
+run (ours AND the hf CLI) verifies and writes real files. Back-to-back
+paired probe in the same window settled the attribution:
+
+| probe (same minute, same client) | result |
+|---|---|
+| i4i warm SimPO via harness (verify + shard write) | 130.8 s (135 MiB/s) |
+| HF SimPO via tracer (no verify, no write) | 70.8 s (249 MiB/s) |
+| i4i warm, transport-only (8 parallel curls → /dev/null) | **590 MiB/s** |
+
+**Corrections this forces:** (1) the harness ceiling of ~135–145 MiB/s
+on big models is the CLIENT's verify + EBS-write pipeline, not the NIC
+— burst bandwidth was demonstrably available (590 MiB/s received). The
+earlier "client NIC sustained rate" attribution in §3 and in the report
+was wrong; small models escaped the wall because their writes fit the
+page cache. (2) "The bottleneck left the server" stands — it just
+landed on the client's disk, not its NIC. (3) Transport-only, the i4i
+cache is **2.4× faster than HF's bridge** to the same client
+(590 vs 249 MiB/s); HF's bridge is itself far from being the
+bottleneck in end-user downloads — the client's tooling and disk are.
+
+### 6c. Original CLI baseline (what a stock `hf download` user gets)
 
 Same models, downloaded from huggingface.co the way a real user does:
 `hf download <repo> --include "*.safetensors*"` — huggingface_hub
@@ -164,23 +221,26 @@ logical bytes, so e2e times are directly comparable. Raw numbers:
 | Egida-DPO 7B | 14.19 GiB | 125.6 s | 116 MiB/s | 12.72 GiB | 1.12x slower | ~parity (0.97x) | 1.23x slower |
 | SimPO 9B | 17.21 GiB | 149.7 s | 118 MiB/s | 15.54 GiB | 1.06x slower | 1.17x slower | 1.17x slower |
 
-Reading:
+Reading (revised after §6a/6b):
 
-1. **TStore's serving tier beats the actual Hugging Face hub on this
-   client for every regime except one** (Egida cold, where they tie).
-   Warm serving wins 1.2x on big models and 7x on the 3B; even cold
-   demand-miss reconstruction matches or beats HF.
-2. **HF runs below the client NIC** (116–118 MiB/s vs the 136–143
-   sustained our warm path pins): CDN + Xet chunk assembly overhead
-   costs it ~15–20% of line rate on big models, and the single-file 3B
-   adapter gets only 66 MiB/s.
-3. **Xet's wire savings are real but modest**: NIC bytes ran 8–10%
-   under the written bytes on 7B/9B (chunk-level dedup/compression).
-   Compare: our store saves 35% at rest; our server path ships amp-1.0
-   logical bytes; our client-decode path ships 0.52–1.45x depending on
-   closure. HF's transfer dedup and our storage dedup are different
-   layers — a hub could do both.
-4. Protocol caveats: 1 rep, public CDN performance varies by time of
-   day and region; our numbers come from a private single-tenant tier —
-   this is a sanity anchor against the real-world incumbent, not a
-   controlled A/B.
+1. **Like-for-like verdicts.** Byte-exact-to-disk tier (harness + CLI):
+   TStore warm (102–130 s) beats the stock HF CLI (125.6 s on Egida,
+   149.7 s on SimPO) and direct S3 on big models, and wins 7× on the
+   3B (3.5 s vs 24.3 s). Transport-only tier (no verify/write): i4i
+   590 MiB/s vs HF bridge 249 MiB/s — 2.4× faster. With an
+   aggressively parallel client and no disk, HF's bridge (69–83 s)
+   beats our *harness* warm numbers — but that comparison crosses
+   tiers; the same aggressive no-disk client against our cache is
+   2.4× faster still.
+2. **The stock CLI leaves a lot on the table**: 66 MiB/s on the
+   single-file 3B and 116–118 MiB/s on shards, vs 138–236 MiB/s for
+   plain range-parallel HTTP against the same bridge. HF performance
+   is largely a client-tooling property.
+3. **Xet's wire savings are real but modest**: 8–10% fewer bytes on
+   the wire than written (chunk-level dedup/compression). Compare: our
+   store saves 35% at rest; server path ships amp-1.0 logical bytes;
+   client-decode ships 0.52–1.45x. Transfer-layer and storage-layer
+   dedup are different layers — a hub could stack both.
+4. Protocol caveats: 1–2 reps, public service whose performance varies
+   by time and load; our tier is private single-tenant — a sanity
+   anchor against the incumbent, not a controlled A/B.

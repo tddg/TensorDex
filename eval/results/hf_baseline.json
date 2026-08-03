@@ -1,11 +1,42 @@
 {
   "date": "2026-08-03",
-  "client": "t3.xlarge us-east-1 (same as all other campaigns)",
-  "tool": "hf download (huggingface_hub 1.26.0, hf_xet backend), --include *.safetensors*, fresh HF_HOME per campaign, 1 rep",
-  "runs": [
-    {"model": "AhmedSSoliman/llama-3.2-3b-chat-doctor", "weights_GiB": 1.56,  "e2e_s": 24.35,  "nic_rx_MiB": 1651,  "goodput_MiBps": 65.6},
-    {"model": "HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO", "weights_GiB": 14.19, "e2e_s": 125.58, "nic_rx_MiB": 13026, "goodput_MiBps": 115.7},
-    {"model": "princeton-nlp/gemma-2-9b-it-SimPO",      "weights_GiB": 17.21, "e2e_s": 149.67, "nic_rx_MiB": 15917, "goodput_MiBps": 117.7}
-  ],
-  "note": "nic_rx below weights size = Xet chunk dedup/compression on the wire (~8-10% on 7B/9B)"
+  "client": "t3.xlarge us-east-1 (same client as all campaigns)",
+  "campaigns": {
+    "cli": {
+      "tool": "hf download (huggingface_hub 1.26.0, hf_xet backend), weights only, fresh cache, writes to disk, 1 rep",
+      "runs": [
+        {"model": "AhmedSSoliman/llama-3.2-3b-chat-doctor", "GiB": 1.56,  "e2e_s": 24.35,  "nic_rx_MiB": 1651,  "MiBps": 65.6},
+        {"model": "HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO", "GiB": 14.19, "e2e_s": 125.58, "nic_rx_MiB": 13026, "MiBps": 115.7},
+        {"model": "princeton-nlp/gemma-2-9b-it-SimPO",      "GiB": 17.21, "e2e_s": 149.67, "nic_rx_MiB": 15917, "MiBps": 117.7}
+      ],
+      "note": "nic_rx < bytes written = Xet chunk dedup/compression on the wire (~8-10% on 7B/9B)"
+    },
+    "traced": {
+      "tool": "eval/scripts/hf_trace_download.py: /resolve redirects followed manually, 128 MiB range-parts, 8 streams, streamed to /dev/null (NO disk write, NO hash verify), per-request provenance headers recorded",
+      "runs": [
+        {"model": "AhmedSSoliman/llama-3.2-3b-chat-doctor", "GiB": 1.56,  "e2e_s": 9.8,  "MiBps": 163, "rep2_s": 8.4},
+        {"model": "Gabbar01/llama-3.2-3b-GSOC-DATASET",     "GiB": 1.56,  "e2e_s": 11.6, "MiBps": 138},
+        {"model": "BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1", "GiB": 1.65, "e2e_s": 10.5, "MiBps": 160},
+        {"model": "KPEP/krx-qwen-2.5-7b-v1.4.4",            "GiB": 14.19, "e2e_s": 82.3, "MiBps": 177},
+        {"model": "HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO", "GiB": 14.19, "e2e_s": 69.3, "MiBps": 210, "rep2_s": 65.1},
+        {"model": "mlfoundations-dev/hp_ablations_qwen_adambeta2_0.95_dcftv1.2", "error": "HTTP 401 - repo gated/private on HF; not anonymously downloadable (our hub serves it)"},
+        {"model": "princeton-nlp/gemma-2-9b-it-SimPO",      "GiB": 17.21, "e2e_s": 74.7, "MiBps": 236, "rep2_s": 85.3},
+        {"model": "TongZheng1999/gemma-2-9b-it-star-truth_table-OP-final_1-2-3Rounds-iter-1", "GiB": 17.21, "e2e_s": 81.5, "MiBps": 216},
+        {"model": "AlexBefest/WoonaV1.2-9b",                "GiB": 17.21, "e2e_s": 82.6, "MiBps": 213}
+      ]
+    },
+    "provenance": {
+      "data_path": "100% of 449 data requests served by us.aws.cdn.hf.co = HF's OWN CDN/Xet bridge (x-hf-cdn-pop: aws-us-east-1). NOT CloudFront (no cloudfront.net CNAME, no Via/X-Cache; plain A records to EC2 us-east-1). NOT direct S3 (S3 origin hidden behind the bridge).",
+      "control_plane": "huggingface.co /resolve hop IS CloudFront-fronted; every redirect was 'X-Cache: Miss from cloudfront' (per-request signed URLs, uncacheable by design), POP IAD55.",
+      "per_stream": {"ttfb_ms_p50": 658, "ttfb_ms_p95": 1201, "MiBps_p50": 28, "MiBps_p5": 18, "MiBps_p95": 63},
+      "edge_warmth": "rep2 vs rep1 on 3 representatives: TTFB 498 vs 640 ms, per-stream 32 vs 28 MiB/s - mild (~10-20%), consistent with a large always-warm regional fleet, not a thin edge cache over S3."
+    },
+    "paired_probe_same_window": {
+      "i4i_warm_harness_SimPO_s": 130.8,
+      "hf_traced_SimPO_s": 70.8,
+      "i4i_transport_only_curl_MiBps": 590,
+      "hf_traced_MiBps": 249,
+      "conclusion": "Harness numbers (both ours and HF CLI) are capped ~135 MiB/s by the CLIENT's verify + EBS-write pipeline, not the NIC (burst was active: 590 MiB/s receive demonstrated). Transport-only, the i4i cache is 2.4x faster than HF's bridge to the same client."
+    }
+  }
 }
