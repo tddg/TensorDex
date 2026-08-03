@@ -180,6 +180,16 @@ always-warm regional fleet rather than a thin edge cache over S3.
 One access finding: `mlfoundations-dev/hp_ablations_qwen...` is
 gated/private on HF (anonymous 401) — our hub serves it.
 
+**CLI route equivalence (verified, closing the protocol caveat):**
+sampling a live CLI download's TCP peers + querying the hub's
+`xet-read-token` API shows the CLI uses `cas-server.xethub.hf.co`
+(EC2, chunk metadata) and pulls chunk DATA from `us.aws.cdn.hf.co` —
+the same fleet the tracer hit. CloudFront-fronted xet hosts
+(`transfer`/`cas-bridge.xethub.hf.co` — `Server: CloudFront`,
+POP IAD55) exist but were not contacted for anonymous downloads; the
+read token carries `hfCdnTier: unauthenticated`, so authenticated
+tiers may route differently.
+
 ### 6b. The client-side pipeline confound, and the like-for-like probe
 
 The traced numbers (69–83 s on 7B/9B, 163–236 MiB/s) look faster than

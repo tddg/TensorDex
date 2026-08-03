@@ -99,7 +99,8 @@
         "MiBps_p5": 18,
         "MiBps_p95": 63
       },
-      "edge_warmth": "rep2 vs rep1 on 3 representatives: TTFB 498 vs 640 ms, per-stream 32 vs 28 MiB/s - mild (~10-20%), consistent with a large always-warm regional fleet, not a thin edge cache over S3."
+      "edge_warmth": "rep2 vs rep1 on 3 representatives: TTFB 498 vs 640 ms, per-stream 32 vs 28 MiB/s - mild (~10-20%), consistent with a large always-warm regional fleet, not a thin edge cache over S3.",
+      "cli_route_equivalence": "Verified by observing a live CLI download's TCP peers (ss sampling) plus the xet-read-token API: the CLI gets casUrl=cas-server.xethub.hf.co (EC2, chunk metadata) and pulls chunk DATA from us.aws.cdn.hf.co - the SAME fleet the /resolve tracer hit. The CloudFront-fronted xet hosts (transfer/cas-bridge.xethub.hf.co, Server: CloudFront, POP IAD55) exist but were NOT contacted for this anonymous download; the token carries hfCdnTier=unauthenticated, so authenticated/other tiers may route differently."
     },
     "paired_probe_same_window": {
       "i4i_warm_harness_SimPO_s": 130.8,

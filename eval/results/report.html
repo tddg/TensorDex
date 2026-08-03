@@ -641,7 +641,15 @@
     things only 10–20% (TTFB 640→498 ms): a big always-warm regional fleet,
     not a thin edge cache over an S3 origin. One access finding:
     <strong>hp-ablations 7B is gated on HF (anonymous 401) — our hub serves
-    it.</strong></p>
+    it.</strong> Route equivalence with the stock CLI was verified, not
+    assumed: sampling a live CLI download's TCP peers (plus the hub's
+    <code>xet-read-token</code> API) shows the CLI pulls chunk data from the
+    same <code>us.aws.cdn.hf.co</code> fleet the tracer hit, with
+    <code>cas-server.xethub.hf.co</code> for chunk metadata; HF's
+    CloudFront-fronted xet hosts (<code>transfer</code>/<code>cas-bridge</code>)
+    exist but were never contacted for anonymous downloads (the read token
+    says <code>hfCdnTier: unauthenticated</code> — authenticated tiers may
+    route differently).</p>
     <p><strong>The paired probe that corrected this report.</strong> The
     traced numbers (69–83 s on big models) beat our harness warm numbers
     (102–130 s) — but the tracer skips verification and disk. Back-to-back
