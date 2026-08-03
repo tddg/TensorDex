@@ -4,7 +4,7 @@ The client talks to the deployed services instead of S3:
   resolve:  GET {metadata_url}/v1/manifest?model=... — per-model manifest
             from the standalone metadata server (production design), no
             local SQLite.
-  download: GET {cache_url}/v1/tensor?tid=... for each *logical* tensor
+  download: GET {cache_url}/v1/tensor/{tid} for each *logical* tensor
             only — deltas/bases are invisible; the cache server fetches
             compressed blobs from S3, decodes and caches. Client-side
             read amplification is exactly 1.0 by construction.
@@ -61,7 +61,7 @@ class TensorDexServerAdapter(DownloadAdapter):
         uniq = {}
         for t in tensors:
             uniq[t["tid"]] = t["logical_bytes"]
-        objects = [{"key": f"/v1/tensor?tid={tid}", "tid": tid,
+        objects = [{"key": f"/v1/tensor/{tid}", "tid": tid,
                     "size": size, "role": "tensor", "depth": 0}
                    for tid, size in sorted(uniq.items())]
         return DownloadPlan(model_id=model_id, system=self.system,
@@ -83,7 +83,7 @@ class TensorDexServerAdapter(DownloadAdapter):
             with budget["cv"]:
                 budget["cv"].wait(0.05)
         rid = uuid.uuid4().hex[:16]
-        url = f"{self.cache_url}/v1/tensor?tid={tid}"
+        url = f"{self.cache_url}/v1/tensor/{tid}"
         recorder.emit("s3_request_start", request_id=rid, key=url,
                       operation="cache_get", tensor_name=tid)
         try:

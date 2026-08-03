@@ -1,0 +1,18 @@
+[Unit]
+Description=TensorDex metadata server (:8701)
+After=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/TensorDex
+ExecStart=/home/ubuntu/TensorDex/.venv/bin/python -m tensordex_serving.metadata_server \
+    --db /home/ubuntu/TensorDex/eval/raw/hub_compressed/metadata.db \
+    --manifest-root /srv/manifests \
+    --prefix compressed_eval \
+    --log /home/ubuntu/TensorDex/logs/metadata_server.jsonl \
+    --port 8701 --workers 2
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

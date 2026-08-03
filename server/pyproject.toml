@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tensordex-serving"
+version = "0.1.0"
+description = "TensorDex hub serving: metadata server + NVMe hot cache (FAST'27 substrate)"
+requires-python = ">=3.9,<3.13"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "boto3>=1.34",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "httpx>=0.27"]
+
+[tool.setuptools.packages.find]
+include = ["tensordex_serving*"]

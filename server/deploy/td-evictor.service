@@ -1,0 +1,20 @@
+[Unit]
+Description=TensorDex cache evictor
+After=mnt-nvme.mount
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/TensorDex
+# i4i.2xlarge sizing: watermarks ~1.45 TB high / 1.25 TB low on the
+# 1.7 TB usable fs => fractions below. Policy is the A/B research flag.
+ExecStart=/home/ubuntu/TensorDex/.venv/bin/python -m tensordex_serving.evictor \
+    --cache-dir /mnt/nvme/cache \
+    --manifest-root /srv/manifests \
+    --policy lru \
+    --high 0.85 --low 0.73 \
+    --log /home/ubuntu/TensorDex/logs/evictor.jsonl
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

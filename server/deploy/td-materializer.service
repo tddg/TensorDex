@@ -1,0 +1,22 @@
+[Unit]
+Description=TensorDex cache materializer (:8702, behind nginx :8700)
+After=network-online.target mnt-nvme.mount
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/TensorDex
+# Auth: IAM instance profile — do NOT put static keys here.
+ExecStart=/home/ubuntu/TensorDex/.venv/bin/python -m tensordex_serving.materializer \
+    --metadata-url http://127.0.0.1:8701 \
+    --bucket tensor-tingfeng \
+    --cache-dir /mnt/nvme/cache \
+    --spill-dir /mnt/nvme/spill \
+    --log /home/ubuntu/TensorDex/logs/materializer.jsonl \
+    --port 8702
+Restart=always
+RestartSec=2
+# The OOM guard of last resort; budgets should keep RSS well under this.
+MemoryMax=12G
+
+[Install]
+WantedBy=multi-user.target
