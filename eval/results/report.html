@@ -1,0 +1,1150 @@
+<title>TensorDex Download Evaluation — Results, Design & Tradeoffs</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f7f9;
+    --surface: #ffffff;
+    --ink: #182129;
+    --ink-2: #46525e;
+    --ink-3: #71808d;
+    --line: #dbe2e8;
+    --line-soft: #e8edf1;
+    --accent: #0e6e8c;
+    --accent-ink: #0a5872;
+    --wash: #eaf2f5;
+    --s1: #2a78d6;  /* direct S3 */
+    --s2: #eb6834;  /* client-side decode */
+    --s3: #1baf7a;  /* server cold */
+    --s4: #eda100;  /* server warm */
+    --crit: #d03b3b;
+    --good-text: #006300;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
+    --serif: "Charter", "Bitstream Charter", "Iowan Old Style", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --bg: #10161c;
+      --surface: #1a212a;
+      --ink: #e7edf2;
+      --ink-2: #a8b5c1;
+      --ink-3: #7c8994;
+      --line: #2b3540;
+      --line-soft: #232d37;
+      --accent: #4fa8c6;
+      --accent-ink: #6cbcd6;
+      --wash: #1d2a32;
+      --s1: #3987e5;
+      --s2: #d95926;
+      --s3: #199e70;
+      --s4: #c98500;
+      --crit: #e66767;
+      --good-text: #0ca30c;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #10161c;
+    --surface: #1a212a;
+    --ink: #e7edf2;
+    --ink-2: #a8b5c1;
+    --ink-3: #7c8994;
+    --line: #2b3540;
+    --line-soft: #232d37;
+    --accent: #4fa8c6;
+    --accent-ink: #6cbcd6;
+    --wash: #1d2a32;
+    --s1: #3987e5;
+    --s2: #d95926;
+    --s3: #199e70;
+    --s4: #c98500;
+    --crit: #e66767;
+    --good-text: #0ca30c;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f5f7f9;
+    --surface: #ffffff;
+    --ink: #182129;
+    --ink-2: #46525e;
+    --ink-3: #71808d;
+    --line: #dbe2e8;
+    --line-soft: #e8edf1;
+    --accent: #0e6e8c;
+    --accent-ink: #0a5872;
+    --wash: #eaf2f5;
+    --s1: #2a78d6;
+    --s2: #eb6834;
+    --s3: #1baf7a;
+    --s4: #eda100;
+    --crit: #d03b3b;
+    --good-text: #006300;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.62;
+  }
+  .shell { max-width: 1080px; margin: 0 auto; padding: 48px 28px 96px; }
+  .prose { max-width: 70ch; }
+
+  h1, h2, h3, h4 { font-family: var(--sans); line-height: 1.2; text-wrap: balance; }
+  h1 { font-size: 2.1rem; font-weight: 650; letter-spacing: -0.015em; margin: 10px 0 8px; }
+  h2 { font-size: 1.35rem; font-weight: 650; margin: 0 0 14px; }
+  h3 { font-size: 1.05rem; font-weight: 650; margin: 26px 0 8px; }
+  p { margin: 0 0 14px; }
+  a { color: var(--accent-ink); }
+  code { font-family: var(--mono); font-size: 0.86em; background: var(--wash); padding: 1px 5px; border-radius: 4px; }
+  strong { font-weight: 640; }
+
+  .eyebrow {
+    font-family: var(--sans); font-size: 0.72rem; font-weight: 650;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-ink);
+  }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 8px 22px;
+    font-family: var(--mono); font-size: 0.78rem; color: var(--ink-3);
+    margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid var(--line);
+  }
+  header.report { margin-bottom: 30px; }
+  header.report .lede { font-size: 1.06rem; color: var(--ink-2); max-width: 72ch; }
+
+  nav.toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 0; }
+  nav.toc a {
+    font-family: var(--sans); font-size: 0.8rem; font-weight: 550;
+    color: var(--ink-2); text-decoration: none;
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px;
+    background: var(--surface);
+  }
+  nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent-ink); border-color: var(--accent); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  section { margin-top: 52px; scroll-margin-top: 24px; }
+  .sec-head { display: baseline; margin-bottom: 4px; }
+  .sec-num {
+    font-family: var(--mono); font-size: 0.8rem; color: var(--ink-3);
+    display: block; margin-bottom: 2px;
+  }
+
+  /* ---- stat tiles ---- */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 12px; margin: 22px 0 6px; }
+  .tile {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px 12px;
+  }
+  .tile .v { font-family: var(--sans); font-size: 1.62rem; font-weight: 650; letter-spacing: -0.01em; }
+  .tile .v small { font-size: 0.95rem; font-weight: 550; color: var(--ink-2); }
+  .tile .k { font-family: var(--sans); font-size: 0.76rem; color: var(--ink-3); margin-top: 2px; line-height: 1.35; }
+  .tile.flag .v { color: var(--crit); }
+  .tile.win .v { color: var(--good-text); }
+
+  /* ---- cards / figures ---- */
+  .fig {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 20px 22px 16px; margin: 20px 0;
+  }
+  .fig-title { font-family: var(--sans); font-size: 0.95rem; font-weight: 650; margin: 0 0 2px; }
+  .fig-sub { font-family: var(--sans); font-size: 0.8rem; color: var(--ink-3); margin: 0 0 14px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 14px; font-family: var(--sans); font-size: 0.78rem; color: var(--ink-2); }
+  .legend .key { display: inline-flex; align-items: center; gap: 7px; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+
+  /* ---- bar rows ---- */
+  .panel { position: relative; padding: 6px 0 2px; }
+  .panel + .panel { border-top: 1px solid var(--line-soft); margin-top: 10px; padding-top: 14px; }
+  .panel-name { font-family: var(--sans); font-size: 0.82rem; font-weight: 650; color: var(--ink-2); margin-bottom: 8px; }
+  .panel-name small { font-weight: 450; color: var(--ink-3); }
+  .brow { display: grid; grid-template-columns: 128px 1fr; align-items: center; gap: 10px; margin: 5px 0; }
+  .brow .rlabel { font-family: var(--sans); font-size: 0.78rem; color: var(--ink-2); text-align: right; line-height: 1.25; }
+  .track { position: relative; display: flex; align-items: center; gap: 8px; min-height: 20px; }
+  .bar {
+    height: 14px; border-radius: 0 4px 4px 0; flex: none;
+    min-width: 2px; transition: opacity 120ms ease;
+  }
+  @media (prefers-reduced-motion: reduce) { .bar { transition: none; } }
+  .track:hover .bar { opacity: 0.85; }
+  .bar.s1 { background: var(--s1); } .bar.s2 { background: var(--s2); }
+  .bar.s3 { background: var(--s3); } .bar.s4 { background: var(--s4); }
+  .bar.old { opacity: 0.45; }
+  .tag { font-family: var(--mono); font-size: 0.68rem; font-weight: 650; letter-spacing: 0.04em;
+         border-radius: 4px; padding: 0 5px; margin-left: 6px; }
+  .tag.t-old { color: var(--ink-3); border: 1px solid var(--line); }
+  .tag.t-new { color: var(--accent-ink); border: 1px solid var(--accent); }
+  .val { font-family: var(--mono); font-size: 0.76rem; color: var(--ink-2); white-space: nowrap; }
+  .refwrap .track::after {
+    content: ""; position: absolute; top: -3px; bottom: -3px; left: var(--ref);
+    border-left: 1.5px dashed var(--ink-3); opacity: 0.55;
+  }
+  .ref-label {
+    font-family: var(--sans); font-size: 0.72rem; color: var(--ink-3);
+    margin: 2px 0 8px; padding-left: 128px;
+  }
+  .annot { font-family: var(--sans); font-size: 0.78rem; color: var(--crit); }
+
+  /* ---- tables ---- */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin: 18px 0; }
+  table { border-collapse: collapse; width: 100%; font-family: var(--sans); font-size: 0.83rem; }
+  th, td { padding: 8px 14px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line-soft); }
+  th { font-weight: 650; color: var(--ink-2); background: var(--wash); position: sticky; top: 0; }
+  th:first-child, td:first-child { text-align: left; }
+  td { font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 0.78rem; color: var(--ink); }
+  td.t { font-family: var(--sans); font-size: 0.82rem; }
+  tr:last-child td { border-bottom: none; }
+  tr.hl td { background: var(--wash); }
+  .sys-dot { display: inline-block; width: 9px; height: 9px; border-radius: 2.5px; margin-right: 7px; vertical-align: baseline; }
+  .best { color: var(--good-text); font-weight: 700; }
+  .worst { color: var(--crit); }
+
+  /* ---- ranked list ---- */
+  ol.ranked { margin: 16px 0 0; padding: 0; list-style: none; counter-reset: rk; }
+  ol.ranked > li {
+    counter-increment: rk; position: relative; padding: 14px 18px 14px 58px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px;
+  }
+  ol.ranked > li::before {
+    content: counter(rk); position: absolute; left: 18px; top: 14px;
+    font-family: var(--mono); font-size: 1.05rem; font-weight: 700; color: var(--accent-ink);
+  }
+  ol.ranked h4 { margin: 0 0 4px; font-size: 0.95rem; }
+  ol.ranked p { margin: 0; font-size: 0.95rem; color: var(--ink-2); }
+
+  /* ---- design cards ---- */
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
+  @media (max-width: 760px) { .duo { grid-template-columns: 1fr; } }
+  .dcard { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+  .dcard h4 { margin: 0 0 8px; font-size: 0.92rem; }
+  .dcard p, .dcard li { font-size: 0.93rem; color: var(--ink-2); }
+  .dcard ul { margin: 0; padding-left: 18px; }
+  .dcard li { margin-bottom: 6px; }
+  .dcard.neg { border-left: 3px solid var(--crit); }
+  .dcard.pos { border-left: 3px solid var(--accent); }
+
+  .verdict {
+    background: var(--wash); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    border-radius: 10px; padding: 16px 20px; margin: 20px 0; max-width: 74ch;
+  }
+  .verdict p { margin: 0; }
+
+  /* ---- diagram ---- */
+  .diagram svg { width: 100%; height: auto; display: block; }
+  .diagram .box { fill: var(--wash); stroke: var(--line); rx: 8; }
+  .diagram .box-strong { fill: var(--surface); stroke: var(--accent); }
+  .diagram text { font-family: var(--sans); fill: var(--ink); }
+  .diagram .t-title { font-size: 13px; font-weight: 650; }
+  .diagram .t-sub { font-size: 10.5px; fill: var(--ink-3); }
+  .diagram .t-edge { font-size: 10.5px; fill: var(--ink-2); }
+  .diagram .edge { stroke: var(--ink-3); stroke-width: 1.4; fill: none; }
+
+  /* ---- tooltip ---- */
+  #tip {
+    position: fixed; z-index: 10; pointer-events: none; display: none;
+    background: var(--ink); color: var(--bg);
+    font-family: var(--sans); font-size: 0.78rem; line-height: 1.45;
+    padding: 8px 12px; border-radius: 8px; max-width: 300px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+  }
+
+  footer.colophon {
+    margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--line);
+    font-family: var(--sans); font-size: 0.8rem; color: var(--ink-3); max-width: 80ch;
+  }
+  footer.colophon code { font-size: 0.92em; }
+</style>
+
+<div class="shell">
+
+<header class="report">
+  <span class="eyebrow">TensorDex · FAST'27 groundwork · measurement study</span>
+  <h1>Where Model-Download Time Goes</h1>
+  <p class="lede">Cold and warm download performance of a delta-compressed tensor
+  hub, measured end-to-end across four delivery regimes and — new in this
+  revision — <strong>two serving-tier deployments compared side by side</strong>:
+  the Stage 1 t3 prototype and the production-shaped i4i.2xlarge tier
+  (metadata server + NVMe cache behind nginx). Plus the production
+  architecture, the client-vs-backend reconstruction tradeoff the numbers now
+  settle, and the FAST'27 research scope — the hub layer between the
+  TensorDex encoder (SOSP'26) and the TDN delivery network.</p>
+  <div class="meta-row">
+    <span>2026-08-02 · updated 08-03</span>
+    <span>72 instrumented runs · all byte-exact (XXH3 per tensor)</span>
+    <span>client: t3.xlarge · us-east-1</span>
+    <span>serving: i4i.2xlarge · NVMe · same VPC</span>
+    <span>9 models · 3 families · 106.3 GB logical</span>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#setup">1 · Setup</a>
+    <a href="#results">2 · Results</a>
+    <a href="#i4i">2b · i4i serving tier</a>
+    <a href="#bottlenecks">3 · Bottlenecks</a>
+    <a href="#design">4 · Production design</a>
+    <a href="#tradeoff">5 · The reconstruction tradeoff</a>
+    <a href="#lessons">6 · Engineering lessons</a>
+    <a href="#scope">7 · FAST'27 scope vs TDN</a>
+    <a href="#next">8 · Plan &amp; next steps</a>
+  </nav>
+</header>
+
+<div class="tiles" role="list">
+  <div class="tile"><div class="v">35.0<small>%</small></div><div class="k">storage saved by the delta hub (106.3 → 69.1 GB, byte-exact)</div></div>
+  <div class="tile"><div class="v">145<small> MB/s</small></div><div class="k">client NIC line rate — direct S3 saturates it</div></div>
+  <div class="tile flag"><div class="v">1.45×</div><div class="k">worst read amplification: depth-2 delta chains (Woona-9B)</div></div>
+  <div class="tile win"><div class="v">3.5<small> s</small></div><div class="k">3B model from warm cache — 3.6× faster than any S3 path (i4i)</div></div>
+  <div class="tile win"><div class="v">2.9×</div><div class="k">faster cold serving on the i4i tier vs the t3 prototype (gemma-9B) — the EBS-era 1.8× warm penalty is gone (§2b)</div></div>
+  <div class="tile"><div class="v">143<small> MB/s</small></div><div class="k">new warm-serving ceiling = the client's NIC, not the cache tier</div></div>
+  <div class="tile"><div class="v">7:1</div><div class="k">server-side fetch : decode time — TensorX decode is never the bottleneck</div></div>
+</div>
+
+<section id="setup">
+  <span class="sec-num">§ 1</span>
+  <h2>Setup: one hub, four ways to download it</h2>
+  <div class="prose">
+    <p>The corpus is a delta-compressed TensorDex hub built from the live store
+    with the full paper pipeline (TensorSketch → FlexSplit attach at 0.70 →
+    TensorX deltas, zstd L1): <strong>9 fine-tunes</strong> in three families —
+    llama-3.2-3B (~1.7 GB each), Qwen2.5-7B (~15.2 GB), gemma-2-9B (~18.5 GB) —
+    stored at <code>compressed_eval/</code> next to the uncompressed dedup-only
+    store at <code>tensordb/</code>. 3,026 of 3,456 tensors are TensorX deltas;
+    every download in this study re-verified every tensor against its
+    content hash.</p>
+    <p>Each model was downloaded under four regimes, every run fully traced
+    (per-request first-byte and body timing, decode timing, resource
+    sampling):</p>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Regime</th><th style="text-align:left">What the client does</th><th style="text-align:left">What it models</th></tr></thead>
+    <tbody>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s1)"></span>Direct S3</td><td class="t" style="text-align:left">GETs raw tensors from the uncompressed dedup store</td><td class="t" style="text-align:left">today's deployment (no compression)</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s2)"></span>Client-side decode</td><td class="t" style="text-align:left">GETs the delta closure (deltas + transitive bases), decodes TensorX locally</td><td class="t" style="text-align:left">"smart client" pulling the compressed hub</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s3)"></span>Server, cold cache</td><td class="t" style="text-align:left">GETs plain tensors from a reconstruction cache that must first fetch + decode from S3</td><td class="t" style="text-align:left">backend reconstruction, first request</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s4)"></span>Server, warm cache</td><td class="t" style="text-align:left">GETs plain tensors already materialized on the cache server's disk</td><td class="t" style="text-align:left">backend reconstruction, hot model</td></tr>
+    </tbody>
+  </table></div>
+  <div class="prose">
+    <p>The server regimes run against two services deployed for this study —
+    a <strong>metadata server</strong> (per-model manifest and per-tensor delta
+    closure over the hub catalog) and a colocated <strong>reconstruction cache
+    server</strong> (S3 closure fetch → TensorX decode → hash verify → disk
+    cache → serve). The client sees plain bytes: read amplification is exactly
+    1.0 by construction, and the closure cost moves server-side.</p>
+  </div>
+</section>
+
+<section id="results">
+  <span class="sec-num">§ 2</span>
+  <h2>Results: end-to-end download time</h2>
+  <div class="prose">
+    <p>Medians over repetitions, interleaved run order. Two facts organize
+    everything: <strong>direct S3 saturates the NIC</strong>, so its time is
+    pure transfer; and every other regime pays for its extra machinery out of
+    that same 145 MB/s unless it can serve from somewhere faster.</p>
+  </div>
+
+  <div class="fig" id="fig-e2e">
+    <p class="fig-title">Median end-to-end download time</p>
+    <p class="fig-sub">Seconds per model family — lower is better. Each panel has its own scale.</p>
+    <div class="legend">
+      <span class="key"><span class="swatch" style="background:var(--s1)"></span>Direct S3</span>
+      <span class="key"><span class="swatch" style="background:var(--s2)"></span>Client-side decode</span>
+      <span class="key"><span class="swatch" style="background:var(--s3)"></span>Server · cold</span>
+      <span class="key"><span class="swatch" style="background:var(--s4)"></span>Server · warm</span>
+    </div>
+
+    <div class="panel">
+      <div class="panel-name">llama-3.2-3B <small>· 1.7 GB logical · scale 0–28 s</small></div>
+      <div class="brow"><span class="rlabel">Direct S3</span><div class="track" data-tip="llama-3.2-3B · direct S3 — 12.6 s. Dedup makes it fetch only 0.89 GB (amp 0.53)."><div class="bar s1" style="width:45%"></div><span class="val">12.6 s</span></div></div>
+      <div class="brow"><span class="rlabel">Client-side decode</span><div class="track" data-tip="llama-3.2-3B · client decode — 18.8 s. Same bytes as direct (amp 0.52) but the decode pipeline drags effective throughput to ~65 MB/s."><div class="bar s2" style="width:67%"></div><span class="val">18.8 s</span></div></div>
+      <div class="brow"><span class="rlabel">Server · cold</span><div class="track" data-tip="llama-3.2-3B · server cold — 25.8 s. Per-tensor materialization: S3 fetch → decode → disk write → serve, unpipelined."><div class="bar s3" style="width:92%"></div><span class="val">25.8 s</span></div></div>
+      <div class="brow"><span class="rlabel">Server · warm</span><div class="track" data-tip="llama-3.2-3B · server warm — 3.9 s at ~700 MB/s. The whole model fits the server's page cache."><div class="bar s4" style="width:14%"></div><span class="val">3.9 s ← page cache</span></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-name">Qwen2.5-7B <small>· 15.2 GB logical · scale 0–290 s</small></div>
+      <div class="brow"><span class="rlabel">Direct S3</span><div class="track" data-tip="Qwen2.5-7B · direct S3 — 112 s. 15.23 GB at ~145 MB/s: pure transfer time."><div class="bar s1" style="width:39%"></div><span class="val">112 s</span></div></div>
+      <div class="brow"><span class="rlabel">Client-side decode</span><div class="track" data-tip="Qwen2.5-7B · client decode — 138 s. Moves 2.8 GB less (12.47 GB) yet loses: effective network drops to ~97 MB/s; 37.8 s decode CPU rides the critical path."><div class="bar s2" style="width:48%"></div><span class="val">138 s</span></div></div>
+      <div class="brow"><span class="rlabel">Server · cold</span><div class="track" data-tip="Qwen2.5-7B · server cold — 277 s. The cache tier leaves ~60% of its NIC idle while materializing tensor-by-tensor."><div class="bar s3" style="width:95%"></div><span class="val">277 s</span></div></div>
+      <div class="brow"><span class="rlabel">Server · warm</span><div class="track" data-tip="Qwen2.5-7B · server warm — 204 s. EBS-resident: server disk-read contends with the client's shard writes at ~77 MB/s total."><div class="bar s4" style="width:70%"></div><span class="val">204 s</span></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-name">gemma-2-9B <small>· 18.5 GB logical · scale 0–420 s</small></div>
+      <div class="brow"><span class="rlabel">Direct S3</span><div class="track" data-tip="gemma-2-9B · direct S3 — 141 s for 18.48 GB. NIC-bound."><div class="bar s1" style="width:34%"></div><span class="val">141 s</span></div></div>
+      <div class="brow"><span class="rlabel">Client-side decode</span><div class="track" data-tip="gemma-2-9B · client decode — 158 s median. Family spread is wide: SimPO 145 s (amp 0.92) but Woona 177 s — its depth-2 chains move 26.9 GB (amp 1.45)."><div class="bar s2" style="width:38%"></div><span class="val">158 s</span></div></div>
+      <div class="brow"><span class="rlabel">Server · cold</span><div class="track" data-tip="gemma-2-9B · server cold — 398 s; Woona hits 415 s with TTFB up to 2.6 s while chains materialize."><div class="bar s3" style="width:95%"></div><span class="val">398 s</span></div></div>
+      <div class="brow"><span class="rlabel">Server · warm</span><div class="track" data-tip="gemma-2-9B · server warm — 258 s. 1.8× slower than just hitting S3: the disk is slower than the network."><div class="bar s4" style="width:62%"></div><span class="val">258 s</span></div></div>
+    </div>
+  </div>
+
+  <div class="fig" id="fig-amp">
+    <p class="fig-title">Read amplification: bytes moved ÷ logical model size</p>
+    <p class="fig-sub">Per model, cold single client. Dashed rule = parity (transfer equals model size). Scale 0–1.6.</p>
+    <div class="legend">
+      <span class="key"><span class="swatch" style="background:var(--s1)"></span>Direct S3 (dedup)</span>
+      <span class="key"><span class="swatch" style="background:var(--s2)"></span>Client-side decode (delta closure)</span>
+    </div>
+    <div class="panel refwrap" style="--ref:62.5%">
+      <div class="brow"><span class="rlabel">chat-doctor 3B</span><div class="track" data-tip="AhmedSSoliman/llama-3.2-3b-chat-doctor — tied embeddings dedup away half the bytes in both stores."><div class="bar s1" style="width:33.1%"></div><span class="val">0.53</span></div></div>
+      <div class="brow"><span class="rlabel"></span><div class="track"><div class="bar s2" style="width:32.5%"></div><span class="val">0.52</span></div></div>
+      <div class="brow"><span class="rlabel">GSOC 3B</span><div class="track" data-tip="Gabbar01/llama-3.2-3b-GSOC-DATASET — near-twin fine-tune; deltas are tiny."><div class="bar s1" style="width:33.1%"></div><span class="val">0.53</span></div></div>
+      <div class="brow"><span class="rlabel"></span><div class="track"><div class="bar s2" style="width:32.5%"></div><span class="val">0.52</span></div></div>
+      <div class="brow"><span class="rlabel">Bangla 3B</span><div class="track" data-tip="BanglaLLM/BanglaLLama — continued-pretrain, farther from base; the only model where the compressed path wins e2e (21.5 s vs 23.5 s)."><div class="bar s1" style="width:62.5%"></div><span class="val">1.00</span></div></div>
+      <div class="brow"><span class="rlabel"></span><div class="track"><div class="bar s2" style="width:50.6%"></div><span class="val">0.81</span></div></div>
+      <div class="brow"><span class="rlabel">krx-qwen 7B</span><div class="track" data-tip="KPEP/krx-qwen-2.5-7b — deltas save 18% of transfer but not enough to beat line-rate direct S3."><div class="bar s1" style="width:62.5%"></div><span class="val">1.00</span></div></div>
+      <div class="brow"><span class="rlabel"></span><div class="track"><div class="bar s2" style="width:51.3%"></div><span class="val">0.82</span></div></div>
+      <div class="brow"><span class="rlabel">Egida-DPO 7B</span><div class="track" data-tip="HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO"><div class="bar s1" style="width:62.5%"></div><span class="val">1.00</span></div></div>
+      <div class="brow"><span class="rlabel"></span><div class="track"><div class="bar s2" style="width:51.3%"></div><span class="val">0.82</span></div></div>
+      <div class="brow"><span class="rlabel">hp-ablations 7B</span><div class="track" data-tip="mlfoundations-dev/hp_ablations_qwen"><div class="bar s1" style="width:62.5%"></div><span class="val">1.00</span></div></div>
+      <div class="brow"><span class="rlabel"></span><div class="track"><div class="bar s2" style="width:57.5%"></div><span class="val">0.92</span></div></div>
+      <div class="brow"><span class="rlabel">SimPO 9B</span><div class="track" data-tip="princeton-nlp/gemma-2-9b-it-SimPO — mostly base tensors, so the closure is nearly the whole model anyway."><div class="bar s1" style="width:62.5%"></div><span class="val">1.00</span></div></div>
+      <div class="brow"><span class="rlabel"></span><div class="track"><div class="bar s2" style="width:57.5%"></div><span class="val">0.92</span></div></div>
+      <div class="brow"><span class="rlabel">Tong-star 9B</span><div class="track" data-tip="TongZheng1999/gemma-2-9b-it-star — chains push the closure past the model's own size."><div class="bar s1" style="width:62.5%"></div><span class="val">1.00</span></div></div>
+      <div class="brow"><span class="rlabel"></span><div class="track"><div class="bar s2" style="width:70.6%"></div><span class="val worst">1.13</span></div></div>
+      <div class="brow"><span class="rlabel">Woona 9B</span><div class="track" data-tip="AlexBefest/WoonaV1.2-9b — depth-2 chains (Woona → Tong deltas → SimPO bases): 26.9 GB moved for 18.5 GB logical."><div class="bar s1" style="width:62.5%"></div><span class="val">1.00</span></div></div>
+      <div class="brow"><span class="rlabel"></span><div class="track"><div class="bar s2" style="width:90.6%"></div><span class="val worst">1.45 — depth-2 chains</span></div></div>
+    </div>
+    <p class="ref-label">┄ parity: bytes moved = logical size</p>
+  </div>
+
+  <div class="fig" id="fig-tput">
+    <p class="fig-title">Effective delivery rate, 18.5 GB class</p>
+    <p class="fig-sub">Logical bytes ÷ end-to-end time (gemma-2-9B family medians), MB/s — higher is better. Dashed rule = NIC line rate. Scale 0–160.</p>
+    <div class="panel refwrap" style="--ref:90.6%">
+      <div class="brow"><span class="rlabel">Direct S3</span><div class="track" data-tip="131 MB/s goodput of a 145 MB/s NIC — direct S3 is essentially at line rate."><div class="bar s1" style="width:81.9%"></div><span class="val">131</span></div></div>
+      <div class="brow"><span class="rlabel">Client-side decode</span><div class="track" data-tip="117 MB/s — decode + hash + shard writes ride the same pipeline as the fetch."><div class="bar s2" style="width:73.1%"></div><span class="val">117</span></div></div>
+      <div class="brow"><span class="rlabel">Server · warm</span><div class="track" data-tip="72 MB/s — gp3 EBS read on the server contending with the client's shard writes. The disk is slower than the network."><div class="bar s4" style="width:45%"></div><span class="val">72</span></div></div>
+      <div class="brow"><span class="rlabel">Server · cold</span><div class="track" data-tip="46 MB/s — sequential per-tensor materialization leaves most of the NIC idle."><div class="bar s3" style="width:28.8%"></div><span class="val">46</span></div></div>
+    </div>
+    <p class="ref-label">┄ NIC line rate ≈ 145 MB/s &nbsp;·&nbsp; for contrast: warm serving from page cache (3B models) reaches <strong>~700 MB/s</strong></p>
+  </div>
+
+  <h3>Full per-model medians</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Model</th><th>Regime</th><th>e2e s</th><th>GB moved</th><th>amp</th><th>net MB/s</th><th>decode CPU s</th><th>TTFB p50 ms</th></tr></thead>
+    <tbody>
+      <tr><td class="t" rowspan="4">chat-doctor 3B</td><td class="t"><span class="sys-dot" style="background:var(--s1)"></span>direct</td><td>12.1</td><td>0.89</td><td>0.53</td><td>86</td><td>—</td><td>66</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s2)"></span>client</td><td>13.5</td><td>0.87</td><td>0.52</td><td>75</td><td>0.1</td><td>64</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s3)"></span>srv cold</td><td>25.8</td><td>0.89</td><td>0.53</td><td>45</td><td>—</td><td>164</td></tr>
+      <tr class="hl"><td class="t"><span class="sys-dot" style="background:var(--s4)"></span>srv warm</td><td class="best">3.2</td><td>0.89</td><td>0.53</td><td>710</td><td>—</td><td>3.8</td></tr>
+      <tr><td class="t" rowspan="4">GSOC 3B</td><td class="t"><span class="sys-dot" style="background:var(--s1)"></span>direct</td><td>12.4</td><td>0.89</td><td>0.53</td><td>83</td><td>—</td><td>70</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s2)"></span>client</td><td>18.8</td><td>0.88</td><td>0.52</td><td>56</td><td>1.6</td><td>67</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s3)"></span>srv cold</td><td>23.7</td><td>0.89</td><td>0.53</td><td>54</td><td>—</td><td>155</td></tr>
+      <tr class="hl"><td class="t"><span class="sys-dot" style="background:var(--s4)"></span>srv warm</td><td class="best">3.9</td><td>0.89</td><td>0.53</td><td>699</td><td>—</td><td>3.7</td></tr>
+      <tr><td class="t" rowspan="4">Bangla 3B</td><td class="t"><span class="sys-dot" style="background:var(--s1)"></span>direct</td><td>23.5</td><td>1.77</td><td>1.00</td><td>80</td><td>—</td><td>69</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s2)"></span>client</td><td class="best">21.6</td><td>1.44</td><td>0.81</td><td>69</td><td>2.4</td><td>68</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s3)"></span>srv cold</td><td>38.5</td><td>1.77</td><td>1.00</td><td>51</td><td>—</td><td>172</td></tr>
+      <tr class="hl"><td class="t"><span class="sys-dot" style="background:var(--s4)"></span>srv warm</td><td>7.1</td><td>1.77</td><td>1.00</td><td>526</td><td>—</td><td>4.4</td></tr>
+      <tr><td class="t" rowspan="4">krx-qwen 7B</td><td class="t"><span class="sys-dot" style="background:var(--s1)"></span>direct</td><td class="best">113.2</td><td>15.23</td><td>1.00</td><td>144</td><td>—</td><td>99</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s2)"></span>client</td><td>123.8</td><td>12.46</td><td>0.82</td><td>108</td><td>37.8</td><td>95</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s3)"></span>srv cold</td><td>276.7</td><td>15.23</td><td>1.00</td><td>57</td><td>—</td><td>398</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s4)"></span>srv warm</td><td>198.3</td><td>15.23</td><td>1.00</td><td>81</td><td>—</td><td>1.2</td></tr>
+      <tr><td class="t" rowspan="4">Egida-DPO 7B</td><td class="t"><span class="sys-dot" style="background:var(--s1)"></span>direct</td><td class="best">112.4</td><td>15.23</td><td>1.00</td><td>145</td><td>—</td><td>99</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s2)"></span>client</td><td>138.3</td><td>12.47</td><td>0.82</td><td>95</td><td>35.4</td><td>85</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s3)"></span>srv cold</td><td>259.5</td><td>15.23</td><td>1.00</td><td>61</td><td>—</td><td>950</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s4)"></span>srv warm</td><td>204.4</td><td>15.23</td><td>1.00</td><td>77</td><td>—</td><td>1.2</td></tr>
+      <tr><td class="t" rowspan="4">hp-ablations 7B</td><td class="t"><span class="sys-dot" style="background:var(--s1)"></span>direct</td><td class="best">113.1</td><td>15.23</td><td>1.00</td><td>144</td><td>—</td><td>97</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s2)"></span>client</td><td>148.1</td><td>13.98</td><td>0.92</td><td>97</td><td>37.8</td><td>91</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s3)"></span>srv cold</td><td>290.6</td><td>15.23</td><td>1.00</td><td>54</td><td>—</td><td>1057</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s4)"></span>srv warm</td><td>205.1</td><td>15.23</td><td>1.00</td><td>77</td><td>—</td><td>1.3</td></tr>
+      <tr><td class="t" rowspan="4">SimPO 9B</td><td class="t"><span class="sys-dot" style="background:var(--s1)"></span>direct</td><td class="best">141.3</td><td>18.48</td><td>1.00</td><td>140</td><td>—</td><td>101</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s2)"></span>client</td><td>144.6</td><td>17.09</td><td>0.92</td><td>126</td><td>11.3</td><td>92</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s3)"></span>srv cold</td><td>299.4</td><td>18.48</td><td>1.00</td><td>64</td><td>—</td><td>784</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s4)"></span>srv warm</td><td>250.7</td><td>18.48</td><td>1.00</td><td>77</td><td>—</td><td>1.3</td></tr>
+      <tr><td class="t" rowspan="4">Tong-star 9B</td><td class="t"><span class="sys-dot" style="background:var(--s1)"></span>direct</td><td class="best">155.2</td><td>18.48</td><td>1.00</td><td>125</td><td>—</td><td>100</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s2)"></span>client</td><td>158.0</td><td class="worst">20.93</td><td class="worst">1.13</td><td>137</td><td>38.2</td><td>103</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s3)"></span>srv cold</td><td>397.8</td><td>18.48</td><td>1.00</td><td>48</td><td>—</td><td>1168</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s4)"></span>srv warm</td><td>260.0</td><td>18.48</td><td>1.00</td><td>74</td><td>—</td><td>1.2</td></tr>
+      <tr><td class="t" rowspan="4">Woona 9B</td><td class="t"><span class="sys-dot" style="background:var(--s1)"></span>direct</td><td class="best">139.8</td><td>18.48</td><td>1.00</td><td>141</td><td>—</td><td>97</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s2)"></span>client</td><td>176.8</td><td class="worst">26.89</td><td class="worst">1.45</td><td>155</td><td>48.2</td><td>99</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s3)"></span>srv cold</td><td>415.5</td><td>18.48</td><td>1.00</td><td>45</td><td>—</td><td class="worst">2595</td></tr>
+      <tr><td class="t"><span class="sys-dot" style="background:var(--s4)"></span>srv warm</td><td>258.4</td><td>18.48</td><td>1.00</td><td>74</td><td>—</td><td>1.2</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="i4i">
+  <span class="sec-num">§ 2b · added 2026-08-03</span>
+  <h2>Serving tier, round two: the i4i deployment</h2>
+  <div class="prose">
+    <p>Everything in §2's server rows came from a <em>prototype</em>: both
+    servers running on the same t3.xlarge as the client, caching on gp3 EBS.
+    The production-shaped tier now exists — a dedicated
+    <strong>i4i.2xlarge</strong> running the real serving stack — and the
+    full 9-model matrix was re-run against it (18 runs, rep 0 cold / rep 1
+    warm, all byte-exact, zero client retries). The two campaigns are
+    reported <strong>side by side, never merged</strong>: they differ in
+    topology, medium, serving code, and cold protocol.</p>
+  </div>
+
+  <div class="duo">
+    <div class="dcard">
+      <h4>t3 prototype <span class="tag t-old">OLD · Stage 1</span></h4>
+      <ul>
+        <li><strong>Topology:</strong> metadata (:8701) + cache (:8702) on the
+        <em>same t3.xlarge as the client</em> — loopback, no network hop,
+        4 vCPU / 16 GB shared between client and servers.</li>
+        <li><strong>Cache medium:</strong> gp3 EBS (~50–130 MB/s, shared with
+        the client's own shard writes); page cache rescued only the 3B models.</li>
+        <li><strong>Cold path:</strong> Python http.server; per-tensor demand
+        materialization, sequential chain fetch — ~60% of bandwidth idle.</li>
+        <li><strong>Cold protocol:</strong> <code>/admin/clear</code> before
+        each model; every cold run started from an empty cache.</li>
+      </ul>
+    </div>
+    <div class="dcard pos">
+      <h4>i4i deployment <span class="tag t-new">NEW · 2026-08-03</span></h4>
+      <ul>
+        <li><strong>Topology:</strong> dedicated i4i.2xlarge (8 vCPU / 64 GB /
+        1.8 TB instance-store NVMe / 12.5 Gbps); t3.xlarge client pulls over
+        the VPC. nginx cache front :8700, metadata :8701; materializer
+        loopback-only.</li>
+        <li><strong>Cache medium:</strong> instance-store NVMe behind
+        <strong>nginx sendfile + X-Accel-Redirect</strong> — Python never
+        copies hot bytes.</li>
+        <li><strong>Serving code:</strong> the <code>server/</code> package
+        (plan Phases 0–2): precomputed immutable manifests + ETag,
+        singleflight materializer, whole-closure pipelining, watermark
+        evictor.</li>
+        <li><strong>Cold protocol:</strong> one full clear, then natural
+        first touch driven by the client's 10 parallel demand streams — no
+        <code>/v1/warm</code> anywhere (see purity note below).</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Fixes shipped between the campaigns</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th style="text-align:left">Fix</th><th style="text-align:left">Defect</th><th style="text-align:left">Visible effect</th></tr></thead>
+    <tbody>
+      <tr><td class="t" style="text-align:left"><strong>keepalive / Content-Length</strong></td>
+          <td class="t" style="text-align:left">the materializer set the file's Content-Length on the empty X-Accel-Redirect reply; uvicorn aborted every miss connection mid-response</td>
+          <td class="t" style="text-align:left">every cache miss burned its connection; one abort raced into a hung response that wedged the first matrix attempt</td></tr>
+      <tr><td class="t" style="text-align:left"><strong>spill isolation</strong></td>
+          <td class="t" style="text-align:left">concurrent demand chains shared one spill dir; one chain unlinked a &gt;512 MB spilled base another still needed</td>
+          <td class="t" style="text-align:left">the <code>tensor_error</code> behind the wedge (FileNotFoundError on a depth-2 delta); now per-pipeline-run spill dirs</td></tr>
+      <tr><td class="t" style="text-align:left"><strong>error path</strong></td>
+          <td class="t" style="text-align:left">materialization failures left the connection open with no status</td>
+          <td class="t" style="text-align:left">now 502 fast-fail (404 for unknown tid) + one-shot re-materialize</td></tr>
+      <tr><td class="t" style="text-align:left"><strong>client timeout + retry</strong></td>
+          <td class="t" style="text-align:left">the adapter had urllib3 retries but no read timeout — a dead stream blocked forever behind the head-of-line budget gate</td>
+          <td class="t" style="text-align:left">180 s silence timeout, 3 idempotent re-issues with backoff; 0 fired in the final matrix</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Per-model end-to-end, side by side (median seconds)</h3>
+  <div class="duo">
+    <div class="dcard">
+      <h4>t3 prototype <span class="tag t-old">OLD</span> <small style="color:var(--ink-3)">· localhost · EBS</small></h4>
+      <div class="tablewrap" style="margin:10px 0 0"><table>
+        <thead><tr><th style="text-align:left">model</th><th>GB</th><th>cold</th><th>warm</th></tr></thead>
+        <tbody>
+          <tr><td class="t">chat-doctor 3B</td><td>1.67</td><td>25.8</td><td>3.2</td></tr>
+          <tr><td class="t">GSOC 3B</td><td>1.67</td><td>23.7</td><td>3.9</td></tr>
+          <tr><td class="t">Bangla 3B</td><td>1.77</td><td>38.5</td><td>7.1</td></tr>
+          <tr><td class="t">krx-qwen 7B</td><td>15.23</td><td>276.7</td><td>198.3</td></tr>
+          <tr><td class="t">Egida-DPO 7B</td><td>15.23</td><td>259.5</td><td>204.4</td></tr>
+          <tr><td class="t">hp-ablations 7B</td><td>15.23</td><td>290.6</td><td>205.1</td></tr>
+          <tr><td class="t">SimPO 9B</td><td>18.48</td><td>299.4</td><td>250.7</td></tr>
+          <tr><td class="t">Tong-star 9B</td><td>18.48</td><td>397.8</td><td>260.0</td></tr>
+          <tr><td class="t">Woona 9B</td><td>18.48</td><td>415.5</td><td>258.4</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="dcard pos">
+      <h4>i4i deployment <span class="tag t-new">NEW</span> <small style="color:var(--ink-3)">· VPC · NVMe</small></h4>
+      <div class="tablewrap" style="margin:10px 0 0"><table>
+        <thead><tr><th style="text-align:left">model</th><th>GB</th><th>cold</th><th>warm</th><th>pre-cached†</th></tr></thead>
+        <tbody>
+          <tr><td class="t">chat-doctor 3B</td><td>1.67</td><td class="best">9.9</td><td class="best">3.5</td><td>0.3%</td></tr>
+          <tr><td class="t">GSOC 3B</td><td>1.67</td><td>28.4</td><td class="best">3.5</td><td>0%</td></tr>
+          <tr><td class="t">Bangla 3B</td><td>1.77</td><td class="worst">43.2</td><td class="best">6.2</td><td>0.2%</td></tr>
+          <tr><td class="t">krx-qwen 7B</td><td>15.23</td><td class="best">117.4</td><td class="best">102.3</td><td>2.5%</td></tr>
+          <tr><td class="t">Egida-DPO 7B</td><td>15.23</td><td class="best">129.2</td><td class="best">101.8</td><td>2.1%</td></tr>
+          <tr><td class="t">hp-ablations 7B</td><td>15.23</td><td class="best">156.3</td><td class="best">103.0</td><td>0.2%</td></tr>
+          <tr><td class="t">SimPO 9B</td><td>18.48</td><td class="best">128.3</td><td class="best">127.9</td><td>7.2%</td></tr>
+          <tr><td class="t">Tong-star 9B</td><td>18.48</td><td class="best">186.0</td><td class="best">128.1</td><td>0.3%</td></tr>
+          <tr><td class="t">Woona 9B</td><td>18.48</td><td class="best">137.4</td><td class="best">129.8</td><td>0.0%</td></tr>
+        </tbody>
+      </table></div>
+      <p style="font-size:0.78rem; color:var(--ink-3); margin:8px 0 0">† share of served bytes
+      already cache-resident from earlier runs' shared closure ancestors (client TTFB &lt; 50 ms) —
+      see the purity note.</p>
+    </div>
+  </div>
+
+  <div class="fig" id="fig-i4i">
+    <p class="fig-title">Server-path e2e: old vs new deployment</p>
+    <p class="fig-sub">Family medians, seconds — lower is better. Translucent bar = t3 prototype,
+    solid = i4i; the blue row is the direct-S3 client baseline on the same scale. Each panel has
+    its own scale.</p>
+    <div class="legend">
+      <span class="key"><span class="swatch" style="background:var(--s1)"></span>Direct S3 (baseline)</span>
+      <span class="key"><span class="swatch" style="background:var(--s3); opacity:.45"></span>cold · t3 proto</span>
+      <span class="key"><span class="swatch" style="background:var(--s3)"></span>cold · i4i</span>
+      <span class="key"><span class="swatch" style="background:var(--s4); opacity:.45"></span>warm · t3 proto</span>
+      <span class="key"><span class="swatch" style="background:var(--s4)"></span>warm · i4i</span>
+    </div>
+    <div class="panel">
+      <div class="panel-name">llama-3.2-3B <small>· 1.7 GB · scale 0–45 s</small></div>
+      <div class="brow"><span class="rlabel">direct S3</span><div class="track" data-tip="llama-3B direct S3 — 12.4 s, the bar to beat."><div class="bar s1" style="width:27.6%"></div><span class="val">12.4 s</span></div></div>
+      <div class="brow"><span class="rlabel">cold · t3 proto</span><div class="track" data-tip="OLD cold — 25.8 s, per-tensor materialization on localhost."><div class="bar s3 old" style="width:57.3%"></div><span class="val">25.8 s</span></div></div>
+      <div class="brow"><span class="rlabel">cold · i4i</span><div class="track" data-tip="NEW cold — 28.4 s median, but a 9.9–43.2 s spread across three near-identical models: latency-bound small tensors, not bandwidth (see below)."><div class="bar s3" style="width:63.1%"></div><span class="val">28.4 s (9.9–43.2)</span></div></div>
+      <div class="brow"><span class="rlabel">warm · t3 proto</span><div class="track" data-tip="OLD warm — 3.9 s from the server's page cache, loopback."><div class="bar s4 old" style="width:8.7%"></div><span class="val">3.9 s</span></div></div>
+      <div class="brow"><span class="rlabel">warm · i4i</span><div class="track" data-tip="NEW warm — 3.5 s over a real network hop at 432–459 MB/s (NIC burst)."><div class="bar s4" style="width:7.8%"></div><span class="val">3.5 s</span></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-name">Qwen2.5-7B <small>· 15.2 GB · scale 0–290 s</small></div>
+      <div class="brow"><span class="rlabel">direct S3</span><div class="track" data-tip="Qwen-7B direct S3 — 113.1 s, NIC-bound."><div class="bar s1" style="width:39%"></div><span class="val">113.1 s</span></div></div>
+      <div class="brow"><span class="rlabel">cold · t3 proto</span><div class="track" data-tip="OLD cold — 276.7 s, 2.4× slower than direct."><div class="bar s3 old" style="width:95.4%"></div><span class="val">276.7 s</span></div></div>
+      <div class="brow"><span class="rlabel">cold · i4i</span><div class="track" data-tip="NEW cold — 129.2 s: 2.1× faster than the prototype, 1.14× of direct S3."><div class="bar s3" style="width:44.6%"></div><span class="val">129.2 s</span></div></div>
+      <div class="brow"><span class="rlabel">warm · t3 proto</span><div class="track" data-tip="OLD warm — 204.4 s, EBS-bound at ~77 MB/s: slower than S3."><div class="bar s4 old" style="width:70.5%"></div><span class="val">204.4 s</span></div></div>
+      <div class="brow"><span class="rlabel">warm · i4i</span><div class="track" data-tip="NEW warm — 102.3 s at 162 MB/s peaks: pinned by the CLIENT's NIC, and still beats direct S3 by 1.1×."><div class="bar s4" style="width:35.3%"></div><span class="val">102.3 s ← beats direct</span></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-name">gemma-2-9B <small>· 18.5 GB · scale 0–420 s</small></div>
+      <div class="brow"><span class="rlabel">direct S3</span><div class="track" data-tip="gemma-9B direct S3 — 141.3 s."><div class="bar s1" style="width:33.6%"></div><span class="val">141.3 s</span></div></div>
+      <div class="brow"><span class="rlabel">cold · t3 proto</span><div class="track" data-tip="OLD cold — 397.8 s; Woona hit 415 s with 2.6 s TTFBs."><div class="bar s3 old" style="width:94.7%"></div><span class="val">397.8 s</span></div></div>
+      <div class="brow"><span class="rlabel">cold · i4i</span><div class="track" data-tip="NEW cold — 137.4 s: 2.9× faster than the prototype, at direct-S3 parity. Woona's 26.9 GB depth-2 closure materialized at 128 MB/s. SimPO materialized faster than the client NIC drains: its cold equals its warm."><div class="bar s3" style="width:32.7%"></div><span class="val">137.4 s ← parity</span></div></div>
+      <div class="brow"><span class="rlabel">warm · t3 proto</span><div class="track" data-tip="OLD warm — 258.4 s, 1.8× slower than direct S3. The finding that motivated the i4i."><div class="bar s4 old" style="width:61.5%"></div><span class="val">258.4 s</span></div></div>
+      <div class="brow"><span class="rlabel">warm · i4i</span><div class="track" data-tip="NEW warm — 128.1 s at 136–143 MB/s: the t3 client's sustained NIC rate. The cache tier is no longer the limiter."><div class="bar s4" style="width:30.5%"></div><span class="val">128.1 s ← beats direct</span></div></div>
+    </div>
+  </div>
+
+  <h3>What moved, and where the bottleneck went</h3>
+  <div class="duo">
+    <div class="dcard pos">
+      <h4>Cold: 2.1–2.9× faster on 7B/9B — direct-S3 parity</h4>
+      <p>Demand-miss materialization driven by 10 client-parallel streams runs
+      93–155 MB/s (prototype: 45–65). Woona's 26.9 GB depth-2 closure
+      materializes in 137 s (was 415 s). SimPO's shallow closure materializes
+      faster than the client NIC drains it — cold equals warm, which is the
+      end state a serving tier wants: <strong>reconstruction fully hidden
+      behind the wire</strong>.</p>
+    </div>
+    <div class="dcard pos">
+      <h4>Warm: 2.0× faster — and the bottleneck left the server</h4>
+      <p>Every big-model warm run pins at 136–143 MB/s, the t3 client's
+      sustained NIC rate; the 3Bs (served during burst credits) hit
+      432–459 MB/s, and the on-box smoke hit <strong>878 MB/s</strong>. The
+      cache tier is no longer measurable from this client — finding its true
+      ceiling needs Stage 3 concurrent clients or a bigger-NIC client.</p>
+    </div>
+    <div class="dcard neg">
+      <h4>The soft spot: llama-3B cold, 9.9 / 28.4 / 43.2 s</h4>
+      <p>Three near-identical 1.7 GB models, all ≥99.7% miss-served — so not
+      cache pollution. The 3B workload is <strong>latency-bound</strong>
+      (~400 tensors at ~4.5 MB average; per-miss round trips dominate,
+      nothing pipelines). The 3× spread needs server-log correlation;
+      suspects are first-run effects (the 28.4 s run started seconds after a
+      materializer restart) and the per-run spill isolation re-materializing
+      the &gt;512 MB shared embedding per chain. Candidate fix: tid-scoped,
+      refcounted spill.</p>
+    </div>
+    <div class="dcard">
+      <h4>Metadata: 9–13 ms</h4>
+      <p>Manifest resolve against precomputed immutable manifests: 9–13 ms
+      (prototype: 26–122 ms; local whole-catalog SQLite: 250–380 ms).
+      Warm-hit TTFB through nginx: 2.9–4.9 ms. Cold TTFB p50 is now the
+      cleanest per-run indicator of materialization queueing: 24 ms (SimPO)
+      to 2.4 s (Tong-star).</p>
+    </div>
+  </div>
+
+  <h3>Cold-run purity: the overlap discovery</h3>
+  <div class="prose">
+    <p>The relaunch protocol assumed no closure shares a tid across models —
+    so natural first-touch cold runs could not contaminate each other.
+    <strong>Post-run measurement falsified the premise:</strong> closures
+    overlap heavily within families (Woona's closure contains 265 of SimPO's
+    464 params; the Qwens share 100+ closure tids pairwise; even
+    chat-doctor/GSOC share 11). Materialization caches closure ancestors, so
+    later cold runs found some tensors resident. Measured impact via client
+    TTFB (&lt;50 ms ⇒ hit): <strong>small</strong> — the shared tids are
+    overwhelmingly norms and biases. Pre-cached <em>bytes</em>: 7.2% for
+    SimPO, ≤2.5% for everything else. The conclusions stand; the per-model
+    table above carries the annotation instead of the runs being discarded.</p>
+  </div>
+  <div class="verdict">
+    <p><strong>The "contamination" is a feature wearing a caveat's
+    clothes.</strong> Cross-model ancestor sharing at the origin tier is
+    exactly what a DAG-aware cache should exploit — serving Woona pre-warms
+    SimPO. It is the serving-side face of delta-graph locality, the
+    phenomenon <code>dag_value</code> eviction scores (contribution C4), and
+    it deserves a designed experiment — serve the base, time the fine-tune —
+    rather than an accidental appearance in a cold protocol.</p>
+  </div>
+</section>
+
+<section id="bottlenecks">
+  <span class="sec-num">§ 3</span>
+  <h2>Bottlenecks, ranked</h2>
+  <div class="prose"><p>The ranking as measured in Stage 1 (t3 era), with each
+  item's fate on the i4i tier marked inline. Net effect: items 3 and the cold
+  half of the story are <em>gone</em>; the NIC is now the wall everywhere.</p></div>
+  <ol class="ranked">
+    <li>
+      <h4>Client NIC line rate (~145 MB/s)</h4>
+      <p>Direct S3 saturates it; its end-to-end time is pure transfer. Nothing
+      beats it on a cold client unless the bytes on the wire actually shrink —
+      and mostly they don't (next item). <strong>i4i: unchanged, and now it
+      caps the server path too</strong> — warm and fast-cold serving both pin
+      at the client NIC; the tier has headroom this client can't consume.</p>
+    </li>
+    <li>
+      <h4>Delta-closure read amplification</h4>
+      <p>Client-side pulls transfer deltas <em>plus all transitive bases</em>:
+      amplification runs 0.52 on near-twin llamas to 1.45 on Woona, whose
+      depth-2 chains move 26.9 GB for an 18.5 GB model. Chain depth converts
+      storage savings into wire cost; only genuinely delta-heavy models
+      (Bangla, 0.81) win end-to-end.</p>
+    </li>
+    <li>
+      <h4>EBS disk throughput (~50–130 MB/s, shared)</h4>
+      <p>The sleeper. Warm big-model serving is disk-bound at ~75 MB/s (server
+      read contending with client shard writes) — <strong>slower than just
+      hitting S3</strong>. Only models that fit page cache see RAM-speed
+      serving (~700 MB/s). Cold reconstruction is worse still (45–65 MB/s):
+      per-tensor materialization leaves ~60% of the NIC idle, with
+      time-to-first-byte up to 2.6 s while a chain decodes.
+      <strong>i4i: eliminated</strong> — NVMe + sendfile serves ≥878 MB/s
+      on-box; big-model cold runs 93–155 MB/s; EBS keeps only the catalog.
+      Residue: latency-bound small-tensor cold (§2b).</p>
+    </li>
+    <li>
+      <h4>TensorX decode CPU — never the bottleneck</h4>
+      <p>Server-side, fetch:decode is ≈ 7:1 on big tensors (2.3 s vs 0.33 s
+      p50). Client-side, ~38 s of decode CPU on a 138 s run overlaps the fetch;
+      it surfaces as effective network dropping 145 → ~97 MB/s, not as
+      added wall time.</p>
+    </li>
+    <li>
+      <h4>Metadata — solved by serving it</h4>
+      <p>Per-model manifest over HTTP: 26–122 ms. Local SQLite over the
+      1.35 GB whole-catalog copy: 250–380 ms. Warm-hit TTFB through the cache:
+      1.2 ms. With per-model manifests, the metadata tier is nowhere near any
+      critical path — the 40× size gap between catalogs (32 MB vs 1.35 GB) is
+      the real argument against shipping the catalog to clients.
+      <strong>i4i: 9–13 ms</strong> with precomputed immutable manifests —
+      solved twice over.</p>
+    </li>
+  </ol>
+</section>
+
+<section id="design">
+  <span class="sec-num">§ 4</span>
+  <h2>Production design: control plane / data plane</h2>
+  <div class="prose">
+    <p>TensorDex today has <strong>no metadata service</strong> — the catalog
+    is a whole-hub SQLite file stored as an S3 object, and the stock S3
+    backend cannot decode deltas. The production shape we converged on
+    separates a thin control plane from an S3 data plane, with reconstruction
+    as an optional tier:</p>
+  </div>
+
+  <div class="fig diagram">
+    <svg viewBox="0 0 880 320" role="img" aria-label="Architecture: client resolves a manifest from the metadata service, then fetches either reconstructed tensors from the cache tier or raw delta blobs directly from S3; background services compact and garbage-collect">
+      <defs>
+        <marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L8,4 L0,8 z" fill="var(--ink-3)"></path>
+        </marker>
+      </defs>
+      <rect class="box box-strong" x="16" y="110" width="168" height="96" rx="9"></rect>
+      <text class="t-title" x="34" y="140">Client</text>
+      <text class="t-sub" x="34" y="160">manifest → parallel GETs</text>
+      <text class="t-sub" x="34" y="176">→ (decode) → hash verify</text>
+      <rect class="box" x="330" y="26" width="228" height="84" rx="9"></rect>
+      <text class="t-title" x="348" y="54">Metadata service</text>
+      <text class="t-sub" x="348" y="74">stateless API · replicated OLTP DB</text>
+      <text class="t-sub" x="348" y="90">tensors · mappings · deltas · refcounts</text>
+      <rect class="box" x="330" y="150" width="228" height="84" rx="9"></rect>
+      <text class="t-title" x="348" y="178">Reconstruction cache</text>
+      <text class="t-sub" x="348" y="198">closure fetch → decode → verify</text>
+      <text class="t-sub" x="348" y="214">RAM/NVMe-backed, hot models only</text>
+      <rect class="box" x="700" y="96" width="164" height="124" rx="9"></rect>
+      <text class="t-title" x="718" y="126">S3</text>
+      <text class="t-sub" x="718" y="146">content-addressed blobs</text>
+      <text class="t-sub" x="718" y="162">raw + TensorX deltas</text>
+      <text class="t-sub" x="718" y="178">catalog object (bootstrap)</text>
+      <rect class="box" x="330" y="262" width="228" height="44" rx="9"></rect>
+      <text class="t-title" x="348" y="282">Background services</text>
+      <text class="t-sub" x="348" y="298">ingest · compactor · refcount GC · auditor</text>
+      <path class="edge" d="M184 130 C 240 110, 270 84, 326 66" marker-end="url(#arr)"></path>
+      <text class="t-edge" x="196" y="86">resolve(model) → manifest · 26–122 ms</text>
+      <path class="edge" d="M184 178 L 326 188" marker-end="url(#arr)"></path>
+      <text class="t-edge" x="200" y="206">GET /tensor · amp 1.0 · warm TTFB 1.2 ms</text>
+      <path class="edge" d="M100 206 C 140 292, 240 300, 690 216" marker-end="url(#arr)"></path>
+      <text class="t-edge" x="96" y="256">smart path: presigned GETs, delta closure · client decodes</text>
+      <path class="edge" d="M558 180 C 620 172, 640 160, 696 148" marker-end="url(#arr)"></path>
+      <text class="t-edge" x="588" y="196">closure fetch</text>
+      <path class="edge" d="M558 284 C 640 280, 700 250, 760 224" marker-end="url(#arr)"></path>
+      <text class="t-edge" x="592" y="268">new objects, pointer flips</text>
+    </svg>
+  </div>
+
+  <div class="duo">
+    <div class="dcard pos">
+      <h4>Control plane</h4>
+      <ul>
+        <li><code>resolve(model) → manifest</code>: the full delta closure — keys,
+        sizes, dtypes, base graph — in one response. Immutable per version,
+        CDN-cacheable. Per-model manifests replace ship-the-whole-catalog.</li>
+        <li><code>begin_upload / commit_upload</code>: blobs first (orphans are
+        harmless), metadata commit last, in one transaction; idempotent
+        retries via content addressing.</li>
+        <li>Presigned URLs keep the metadata tier out of the byte path
+        entirely — it only ever moves kilobytes.</li>
+      </ul>
+    </div>
+    <div class="dcard pos">
+      <h4>Data plane &amp; background</h4>
+      <ul>
+        <li>Content-addressed blobs on S3; per-tensor hash verify end-to-end
+        (free integrity — keep it).</li>
+        <li>Async compactor: FlexSplit pairing + TensorX encode, never
+        blocking upload, never rewriting in place — write new object, flip
+        pointer, GC the old.</li>
+        <li>Refcount GC over the delta DAG with a grace period, plus a
+        metadata↔S3 auditor (HEAD sampling).</li>
+        <li>Distribution chains capped at depth 1; deeper chains belong in
+        cold archival tiers behind reconstruction.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>"S3 is replicated, so no extra fault tolerance" — rejected, with evidence</h3>
+  <div class="prose"><p>S3 protects bytes, not cross-object invariants — and
+  TensorDex's value lives entirely in those invariants. Our own bucket is the
+  case study:</p></div>
+  <div class="duo">
+    <div class="dcard neg">
+      <h4>Metadata is the durability crux</h4>
+      <p>Content-addressed keys are opaque hashes: lose the metadata and 72 TB
+      of perfectly durable blobs become garbage. The metadata tier needs
+      replication, backups, and point-in-time recovery <em>more</em> than the
+      blobs need anything.</p>
+    </div>
+    <div class="dcard neg">
+      <h4>Half-finished ingests leak</h4>
+      <p>~1M orphaned blobs (~32 TB — 44% of the bucket) from partial
+      ingests. The fix is write ordering plus mark-and-sweep GC, not
+      replication.</p>
+    </div>
+    <div class="dcard neg">
+      <h4>The inverse failure is worse</h4>
+      <p>One model sat 'ready' in metadata with 417 of 464 blobs already
+      garbage-collected. With deltas this sharpens: a base may serve
+      <em>other</em> models' deltas, so deletion must be refcount-driven over
+      the delta DAG — never per-model.</p>
+    </div>
+    <div class="dcard neg">
+      <h4>In-place rewrite races readers</h4>
+      <p>The AE pipeline overwrites a raw blob with its delta, then updates the
+      row — fine offline, a torn read under concurrent clients. Compaction
+      must be copy-on-write with a transactional pointer flip.</p>
+    </div>
+  </div>
+</section>
+
+<section id="tradeoff">
+  <span class="sec-num">§ 5</span>
+  <h2>The reconstruction tradeoff: client-side vs backend</h2>
+  <div class="prose">
+    <p>The instinct "users will prefer backend reconstruction" is right for
+    one population and costly for the other. The measurements sharpened the
+    tradeoff into three facts:</p>
+    <p><strong>Decompression is not the cost.</strong> TensorX decode is ~8.5 s
+    of CPU against a 348 s cold download. The real tax of client-side decode is
+    the <em>dependency closure</em> — which is why the Docker precedent
+    doesn't transfer: per-blob zstd is self-contained; delta-vs-base is not.</p>
+    <p><strong>Who already has the bases decides the winner.</strong> A cold
+    one-shot client has nothing, pays the closure, and can't reuse it —
+    backend reconstruction strictly dominates for them, and it's transparent
+    (plain safetensors, existing tooling works). A warm fleet pulling
+    successive fine-tunes of one family holds the bases locally and pays only
+    delta bytes for each new model — ~10× less last-hop traffic than
+    <em>any</em> backend scheme, which must always ship full logical bytes.
+    Backend reconstruction permanently forfeits that win because it destroys
+    the delta structure before the bytes cross the network.</p>
+    <p><strong>A reconstruction cache is really tiered storage.</strong>
+    Decoded hot models at the edge, compressed cold models in S3 — the
+    Xet/CAS shape. Deploy it on hardware whose serving medium beats the
+    client's S3 path: this study's gp3-EBS cache <em>helps</em> 3B models
+    (page cache, 4× faster) and <em>hurts</em> 15–18 GB models (1.8× slower
+    than direct S3).</p>
+  </div>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th style="text-align:left">Dimension</th><th style="text-align:left">Client-side decode</th><th style="text-align:left">Backend reconstruction</th></tr></thead>
+    <tbody>
+      <tr><td class="t">Cold single client</td><td class="t" style="text-align:left">pays closure amp (0.52–1.45×) + pipeline drag</td><td class="t" style="text-align:left"><span class="best">wins</span> — if the cache tier is RAM/NVMe-backed <strong>(condition now measured and met: §2b)</strong></td></tr>
+      <tr><td class="t">Warm fleet (fine-tune churn)</td><td class="t" style="text-align:left"><span class="best">wins ~10×</span> on traffic — only delta bytes move</td><td class="t" style="text-align:left">always ships full logical bytes on the last hop</td></tr>
+      <tr><td class="t">Client requirements</td><td class="t" style="text-align:left">TensorDex-aware client, decode CPU, base cache</td><td class="t" style="text-align:left">none — plain safetensors over HTTP</td></tr>
+      <tr><td class="t">Egress economics</td><td class="t" style="text-align:left">minimal bytes cross the paid hop</td><td class="t" style="text-align:left">maximal bytes cross the paid hop</td></tr>
+      <tr><td class="t">Operator burden</td><td class="t" style="text-align:left">metadata service only — S3 carries the data plane</td><td class="t" style="text-align:left">a provisioned, scaled, cached serving fleet</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="verdict">
+    <p><strong>Production answer: offer both, per client.</strong>
+    <code>resolve()</code> returns either presigned URLs for reconstructed
+    artifacts via the cache tier (the default — transparent, cold-client
+    friendly) or the delta closure for smart clients that advertise which
+    bases they already hold and receive only the missing keys. The smart path
+    degrades gracefully to the plain one. Priority order per the study:
+    performance evaluation first (done — this report), full tradeoff
+    quantification next (Stage 2 measures the warm-fleet delta win).</p>
+  </div>
+  <div class="verdict">
+    <p><strong>Updated verdict (2026-08-03, §2b):</strong> on real serving
+    hardware, backend reconstruction dominates client-side decode in
+    <em>every</em> measured regime, and matches or beats uncompressed direct
+    S3 everywhere except cold small models — while the store keeps its 35%
+    size reduction. Client-side decode remains the right opt-in for warm
+    fleets with local base caches, and the fallback when no serving tier is
+    nearby.</p>
+  </div>
+</section>
+
+<section id="lessons">
+  <span class="sec-num">§ 6</span>
+  <h2>Engineering lessons from the measurement clients</h2>
+  <div class="prose">
+    <p>Three OOM kills during this study traced to the <em>same</em> pattern:
+    a fast producer (S3 or the cache server) feeding a slow consumer (decode,
+    hash, EBS writes) through implicit buffering. A budget valve that let
+    fetches "trickle" past the cap accumulated completed buffers without
+    bound; a list of futures silently retained every fetched buffer until the
+    loop ended; depth-2 delta chains stacked three ~1.8 GB decoded tensors on
+    a 16 GB host.</p>
+    <p>The fixes generalize to any streaming tensor client: <strong>explicit,
+    end-to-end byte-budget back-pressure</strong> — admission control where
+    only the head-of-line blob may exceed the budget, dropping each buffer
+    reference at consumption, refcounted decoded-base caches with disk spill,
+    and preallocated output shards written by offset. Peak client RSS fell
+    from 15 GB (killed) to 5.4 GB (stable) with no throughput loss. One
+    format gotcha worth recording: per-tensor codec metadata lives as a
+    JSON <em>string</em> under <code>__metadata__[name]</code> inside each
+    blob — missing <code>item_size</code> there decodes float32 deltas with
+    the wrong byte-plane width, which the end-to-end hash verify caught.</p>
+    <p><strong>The i4i campaign added the dual of the buffering lesson:
+    unbounded <em>waits</em>.</strong> A server-side abort left a response
+    stream open forever; the client had retries but no read timeout, and the
+    head-of-line gate faithfully queued the entire download behind one dead
+    request. Every streaming client needs a silence timeout plus idempotent
+    re-issue — content addressing makes the retry free. Two more, from the
+    server side: correctness fixes have throughput prices (per-run spill
+    isolation fixed an unlink race but may re-materialize shared spilled
+    bases per chain — the sharing-vs-isolation choice wants a tid-scoped,
+    refcounted resource, not a blanket rule); and protocol premises need
+    measurement, not agreement — "no closures overlap" was believed by
+    everyone and false, caught by TTFB distributions in the traces (§2b).</p>
+  </div>
+</section>
+
+<section id="scope">
+  <span class="sec-num">§ 7</span>
+  <h2>FAST'27 research scope: the hub between TensorDex and TDN</h2>
+  <div class="prose">
+    <p>Three lines of work now share this territory, and the FAST'27 paper is
+    defined by the layer the other two assume but don't build. TensorDex
+    (SOSP'26) is an <em>encoder</em> — offline, single-writer, no users. TDN
+    is a <em>delivery network</em> — geo-distributed edges caching
+    reconstructed or compressed tensors, owning placement, egress
+    minimization, and user-perceived delivery performance. Neither is a hub
+    that real users upload to, delete from, and download from concurrently.</p>
+  </div>
+
+  <div class="fig diagram">
+    <svg viewBox="0 0 880 240" role="img" aria-label="Layer map: TensorDex encoder feeds the hub storage service, which the TDN delivery network consumes">
+      <defs>
+        <marker id="arr2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L8,4 L0,8 z" fill="var(--ink-3)"></path>
+        </marker>
+      </defs>
+      <rect class="box" x="16" y="52" width="240" height="110" rx="9"></rect>
+      <text class="t-title" x="34" y="82">TensorDex</text>
+      <text class="t-sub" x="34" y="100">SOSP'26 · the encoder</text>
+      <text class="t-sub" x="34" y="120">dedup · sketch · pairing · TensorX</text>
+      <text class="t-sub" x="34" y="136">offline, single-writer</text>
+      <rect class="box box-strong" x="320" y="36" width="240" height="142" rx="9"></rect>
+      <text class="t-title" x="338" y="66">The Hub — FAST'27</text>
+      <text class="t-sub" x="338" y="86">the storage service (this work)</text>
+      <text class="t-sub" x="338" y="106">DAG-transactional lifecycle</text>
+      <text class="t-sub" x="338" y="122">online ingest · storage form</text>
+      <text class="t-sub" x="338" y="138">manifests · /plan · reconstruct-on-read</text>
+      <text class="t-sub" x="338" y="158">origin serving tier</text>
+      <rect class="box" x="624" y="52" width="240" height="110" rx="9"></rect>
+      <text class="t-title" x="642" y="82">TDN</text>
+      <text class="t-sub" x="642" y="100">tensor distribution network</text>
+      <text class="t-sub" x="642" y="120">geo-distributed edge caches</text>
+      <text class="t-sub" x="642" y="136">placement · egress · steering</text>
+      <path class="edge" d="M256 107 L 316 107" marker-end="url(#arr2)"></path>
+      <text class="t-edge" x="238" y="94" >encodes into</text>
+      <path class="edge" d="M560 107 L 620 107" marker-end="url(#arr2)"></path>
+      <text class="t-edge" x="548" y="94">serves via API</text>
+      <text class="t-edge" x="320" y="212">an edge is just a client with a very large have-list — TDN consumes the hub's interface</text>
+    </svg>
+  </div>
+
+  <div class="verdict">
+    <p><strong>Thesis: in a derivative-aware store, every ordinary hub
+    operation becomes a DAG transaction.</strong> Upload, delete, compaction,
+    and garbage collection — trivial in a plain object store — acquire
+    cross-object invariants once tensors reference other tensors. The system
+    that maintains those invariants under concurrency and failure, while
+    still serving reads, is the missing layer between the encoder and the
+    delivery network.</p>
+  </div>
+
+  <div class="duo">
+    <div class="dcard pos">
+      <h4>C1 · Transactional lifecycle over the delta DAG</h4>
+      <p>Upload commit (blobs first, one metadata transaction last,
+      idempotent by content address); refcount GC where a base may serve
+      other models' deltas — deletion is a DAG operation, never per-model;
+      copy-on-write compaction with transactional pointer flips.
+      <strong>Motivated by live-bucket forensics:</strong> 44% of 72 TB
+      orphaned by partial ingests; 'ready' models whose blobs were GC'd.</p>
+    </div>
+    <div class="dcard pos">
+      <h4>C2 · Online ingest + storage-form scheduling</h4>
+      <p>Synchronous dedup at upload; sketching and pairing async; the hub
+      decides <em>when and what to (re)compress</em> and each tensor's
+      origin form — hot raw or shallow, cold deep-chained — under a bounded
+      local working set. The storage-form residue of the measured
+      "storage-optimal ≠ distribution-optimal" tension; placement itself is
+      TDN's.</p>
+    </div>
+    <div class="dcard pos">
+      <h4>C3 · The DAG-aware interface as narrow waist</h4>
+      <p>Immutable per-model manifests, closure queries, have/want
+      negotiation (<code>/v1/plan</code>), reconstruct-on-read. FAST defines
+      the interface and shows a plain client using it; TDN consumes it.
+      This makes the two papers load-bearing for each other instead of
+      overlapping.</p>
+    </div>
+    <div class="dcard">
+      <h4>C4 · DAG-weighted origin caching — pending boundary</h4>
+      <p>Eviction where a cached base is worth the summed re-materialization
+      cost of its resident dependents; A/B against LRU on the same trace.
+      <strong>Claim only if TDN's edge-caching sections don't claim
+      graph-aware eviction</strong> — needs a written boundary agreement
+      with the TDN authors early (shared reviewer pool).</p>
+    </div>
+  </div>
+
+  <h3>Territory discipline</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th style="text-align:left">FAST'27 claims</th><th style="text-align:left">FAST'27 never claims (TDN's, cited as companion)</th></tr></thead>
+    <tbody>
+      <tr><td class="t" style="text-align:left">lifecycle correctness: upload commit, refcount GC, COW compaction</td><td class="t" style="text-align:left">geo-placement of replicas or caches</td></tr>
+      <tr><td class="t" style="text-align:left">origin storage form (raw / delta / chain depth) as compaction policy</td><td class="t" style="text-align:left">cross-site egress optimization</td></tr>
+      <tr><td class="t" style="text-align:left">the serving interface: manifests, closure, /plan negotiation</td><td class="t" style="text-align:left">edge cache coordination, client steering</td></tr>
+      <tr><td class="t" style="text-align:left">measurement study + bucket forensics (this report)</td><td class="t" style="text-align:left">user-perceived delivery QoE across regions</td></tr>
+    </tbody>
+  </table></div>
+  <div class="prose">
+    <p>Also not claimed as novel, by anyone: manifests, content-addressed
+    layout, back-pressure clients, sendfile serving — implementation,
+    cited as such.</p>
+  </div>
+</section>
+
+<section id="next">
+  <span class="sec-num">§ 8</span>
+  <h2>Implementation plan &amp; next steps</h2>
+  <div class="prose">
+    <p>The build plan (full detail in
+    <code>eval/SERVING_IMPLEMENTATION_PLAN.md</code>) targets one
+    i4i.2xlarge — 64 GB RAM, 1.8 TB <em>instance-store</em> NVMe (the cache
+    is re-derivable, so ephemeral disk is correct; catalog and manifests
+    stay on EBS), IAM instance profile instead of static keys.
+    <strong>Status 2026-08-03: Phases 0–2 and 4 are built, deployed, and
+    validated end-to-end</strong> (the §2b matrix is the acceptance test);
+    remaining operational items are the IAM role attach + systemd cutover
+    (services still nohup-run with env keys) and the Phase 3
+    <code>/v1/plan</code> negotiating client:</p>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Phase</th><th style="text-align:left">Deliverable</th><th style="text-align:left">Key decisions</th></tr></thead>
+    <tbody>
+      <tr><td>0</td><td class="t" style="text-align:left">Shared library</td><td class="t" style="text-align:left">manifest builder (golden-tested vs eval adapter); the proven head-of-line fetch/decode pipeline; blob parser</td></tr>
+      <tr><td>1</td><td class="t" style="text-align:left">Metadata server</td><td class="t" style="text-align:left">manifests precomputed at ingest, served as immutable static files (ETag); <code>/v1/plan</code> have/want negotiation in v1 — it is contribution C3</td></tr>
+      <tr><td>2</td><td class="t" style="text-align:left">NVMe hot cache</td><td class="t" style="text-align:left">nginx try_files + X-Accel-Redirect (Python never copies hot bytes); whole-closure warming on first miss; pluggable eviction: <code>lru</code> vs <code>dag_value</code> behind a flag (C4 experiment)</td></tr>
+      <tr><td>3</td><td class="t" style="text-align:left">Negotiating client</td><td class="t" style="text-align:left">extends the eval adapter; doubles as the Stage 2 warm-fleet harness</td></tr>
+      <tr><td>4</td><td class="t" style="text-align:left">i4i.2xlarge bring-up</td><td class="t" style="text-align:left">xfs + relatime on instance store; systemd units; ~8 GB materializer budget, ~50 GB left to page cache</td></tr>
+      <tr><td>5</td><td class="t" style="text-align:left">DAG-transactional write path</td><td class="t" style="text-align:left">the paper spine (C1/C2): upload commit, refcount GC + auditor, COW compaction, online ingest; fault-injection harness as correctness evaluation</td></tr>
+    </tbody>
+  </table></div>
+  <div class="duo">
+    <div class="dcard">
+      <h4>Where everything lives</h4>
+      <ul>
+        <li><code>eval/SERVING_IMPLEMENTATION_PLAN.md</code> — the plan above, in full</li>
+        <li><code>eval/results/DOWNLOAD_COMPARISON.md</code> — tables + analysis (this report's source data)</li>
+        <li><code>eval/results/{single_client,server_client}/</code> — 54 run traces, per-run metrics CSV</li>
+        <li><code>eval/results/i4i_server/</code> — the §2b matrix: 18 traces, <code>I4I_COMPARISON.md</code> (side-by-side tables), <code>PROTOCOL.md</code></li>
+        <li><code>eval/DESIGN_NOTES.md</code> — the design discussion in full</li>
+        <li><code>server/</code> — the deployed serving stack (metadata server, materializer, evictor, nginx config, systemd units, bootstrap)</li>
+        <li><code>eval/server/</code> — the retired t3 prototype servers</li>
+        <li><code>s3://tensor-tingfeng/compressed_eval/</code> — the 69.1 GB delta hub (write-only prefix; live store untouched)</li>
+      </ul>
+    </div>
+    <div class="dcard">
+      <h4>Next</h4>
+      <ul>
+        <li><strong>Boundary doc with TDN authors</strong> — settle C4
+        ownership before writing starts.</li>
+        <li>IAM role + systemd cutover on the i4i; investigate the 3B cold
+        spread via server logs (candidate fix: tid-scoped refcounted spill).</li>
+        <li>Stage 2 base-cache reuse via <code>/v1/plan</code> have-lists;
+        the designed cross-model ancestor experiment (§2b).</li>
+        <li>Stage 3 concurrent clients — the client NIC now hides the tier's
+        true ceiling; LRU-vs-DAG eviction A/B rides the same runs.</li>
+        <li>Phase 5 write path + fault injection; ZipNN/raw baselines; the
+        decision memo.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+<footer class="colophon">
+  <p>TensorDex download evaluation · 72 runs, 2026-08-01 → 03, all byte-exact ·
+  client t3.xlarge (16 GB) in us-east-1 against same-region S3 and (for §2b)
+  the i4i.2xlarge serving tier over the VPC. Fairness notes: identical adapter
+  code across all recorded runs within each campaign; interleaved run order;
+  metadata pre-fetched locally for both S3 regimes with resolve time measured
+  in-band. Server cold protocol — t3 campaign: cache cleared between models;
+  i4i campaign: one full clear then natural first touch, demand-miss,
+  client-parallel ×10, with per-run pre-cached-bytes annotations from the
+  closure-overlap discovery (§2b). Medians over 2 reps.</p>
+</footer>
+
+</div>
+<div id="tip" role="status" aria-hidden="true"></div>
+<script>
+  (function () {
+    var tip = document.getElementById("tip");
+    var tracks = document.querySelectorAll(".track[data-tip]");
+    tracks.forEach(function (el) {
+      el.addEventListener("mousemove", function (e) {
+        tip.textContent = el.getAttribute("data-tip");
+        tip.style.display = "block";
+        var pad = 14;
+        var w = tip.offsetWidth, h = tip.offsetHeight;
+        var x = Math.min(e.clientX + pad, window.innerWidth - w - 8);
+        var y = e.clientY - h - pad;
+        if (y < 8) y = e.clientY + pad;
+        tip.style.left = x + "px";
+        tip.style.top = y + "px";
+      });
+      el.addEventListener("mouseleave", function () {
+        tip.style.display = "none";
+      });
+    });
+  })();
+</script>
+

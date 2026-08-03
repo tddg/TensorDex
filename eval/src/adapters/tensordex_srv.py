@@ -17,6 +17,7 @@ from __future__ import annotations
 import concurrent.futures as cf
 import json
 import threading
+import time
 import urllib.parse
 import uuid
 
@@ -42,8 +43,9 @@ class TensorDexServerAdapter(DownloadAdapter):
         self.inflight_budget = inflight_budget
         self.max_shard_bytes = max_shard_bytes
         self.http = urllib3.PoolManager(
-            maxsize=max_workers + 4, retries=urllib3.Retry(
-                total=3, backoff_factor=0.5))
+            maxsize=max_workers + 4,
+            timeout=urllib3.Timeout(connect=10, read=180),
+            retries=urllib3.Retry(total=3, backoff_factor=0.5))
 
     def resolve(self, model_id: str) -> DownloadPlan:
         url = (f"{self.metadata_url}/v1/manifest?"
@@ -82,35 +84,55 @@ class TensorDexServerAdapter(DownloadAdapter):
                     break
             with budget["cv"]:
                 budget["cv"].wait(0.05)
-        rid = uuid.uuid4().hex[:16]
         url = f"{self.cache_url}/v1/tensor/{tid}"
-        recorder.emit("s3_request_start", request_id=rid, key=url,
-                      operation="cache_get", tensor_name=tid)
-        try:
-            r = self.http.request("GET", url, preload_content=False)
-            recorder.emit("s3_headers", request_id=rid,
-                          http_status=r.status)
-            if r.status != 200:
-                raise ValueError(f"cache_get {tid} -> {r.status}")
-            n = int(r.headers.get("Content-Length", size))
-            buf = bytearray(n)
-            view = memoryview(buf)
-            off = 0
-            first = True
-            for chunk in r.stream(CHUNK):
-                if first:
-                    recorder.emit("s3_first_byte", request_id=rid)
-                    first = False
-                view[off:off + len(chunk)] = chunk
-                off += len(chunk)
-            r.release_conn()
-            if off != n:
-                raise ValueError(f"short read {tid}: {off} != {n}")
-            recorder.emit("s3_request_end", request_id=rid,
-                          payload_bytes=n)
-            return buf
-        finally:
-            pass
+        # Read timeout + explicit re-issue: a materialization that dies
+        # server-side can leave the response stream open forever, and
+        # urllib3 cannot resume a body that died mid-stream. Retrying is
+        # safe (content-addressed, idempotent GET); the singleflight on
+        # the server dedupes concurrent re-materializations.
+        last_exc = None
+        for attempt in range(3):
+            rid = uuid.uuid4().hex[:16]
+            recorder.emit("s3_request_start", request_id=rid, key=url,
+                          operation="cache_get", tensor_name=tid,
+                          attempt=attempt)
+            r = None
+            try:
+                r = self.http.request("GET", url, preload_content=False)
+                recorder.emit("s3_headers", request_id=rid,
+                              http_status=r.status)
+                if r.status != 200:
+                    raise ValueError(f"cache_get {tid} -> {r.status}")
+                n = int(r.headers.get("Content-Length", size))
+                buf = bytearray(n)
+                view = memoryview(buf)
+                off = 0
+                first = True
+                for chunk in r.stream(CHUNK):
+                    if first:
+                        recorder.emit("s3_first_byte", request_id=rid)
+                        first = False
+                    view[off:off + len(chunk)] = chunk
+                    off += len(chunk)
+                r.release_conn()
+                if off != n:
+                    raise ValueError(f"short read {tid}: {off} != {n}")
+                recorder.emit("s3_request_end", request_id=rid,
+                              payload_bytes=n)
+                return buf
+            except Exception as exc:  # noqa: BLE001 — retry then re-raise
+                last_exc = exc
+                if r is not None:
+                    try:
+                        r.close()
+                    except Exception:
+                        pass
+                recorder.emit("cache_retry", request_id=rid,
+                              tensor_name=tid, attempt=attempt,
+                              error=repr(exc))
+                time.sleep(2 ** attempt)
+        raise RuntimeError(
+            f"cache_get {tid} failed after 3 attempts") from last_exc
 
     def download(self, plan: DownloadPlan, output_dir: str,
                  recorder: EventRecorder) -> DownloadResult:
