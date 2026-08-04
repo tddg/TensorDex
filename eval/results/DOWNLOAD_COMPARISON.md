@@ -2,6 +2,30 @@
 
 Medians over reps (min reps per cell: 1). tensordex = uncompressed dedup store (`tensordb/`), tensordex_c = delta-compressed hub (`compressed_eval/`).
 
+## Origin store census (`s3://tensor-tingfeng/tensordb/`, measured 2026-08-04)
+
+Registered store, per the metadata DB (`master.db` snapshot of 2026-08-01;
+tables `model_meta` / `model_mappings` / `tensors`):
+
+| stat | value |
+|---|---|
+| models | **2,894** (2,892 ready · 1 ingesting · 1 failed) |
+| named parameters (model→tensor mappings) | **964,011** |
+| unique tensors (content-addressed blobs) | **742,027** |
+| unique bytes (physical, registered) | **40.1 TB** |
+| logical bytes (sum over all models) | **45.0 TB** |
+| identical-tensor dedup saving | **4.8 TB (10.8%)** — 22,784 tensors shared by >1 model |
+| avg tensors / model · avg tensor size | 333 · 54 MB |
+
+This store is **uncompressed originals only** — `tensor_deltas` is empty;
+delta compression lives in the separate 9-model `compressed_eval/` hub
+(69 GB, 35% saved, byte-exact). Bucket-level inventory is larger than the
+registered store: `blobs/` holds **1,775,896** `.safetensors` objects,
+**71.9 TB** total — i.e. ~1.03M blobs / 31.8 TB are not referenced by the
+current metadata DB (earlier/unregistered ingests; every key is a
+one-per-tid tensor blob, no sidecar files). All eval models resolve
+against the registered set.
+
 | model | sys | e2e_s | logical_GB | s3_GB | gets | read_amp | resolve_ms | fetch_span_s | net_MBps | decode_cpu_ms | tail_s | ttfb_ms_p50 | goodput_MBps | rss_peak_GB | proc_cpu_pct_mean | disk_write_MBps |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | AhmedSSoliman/llama-3.2-3b-chat-doctor | td | 12.05 | 1.67 | 0.89 | 393 | 0.53 | 254 | 10.35 | 85.51 | 0 | 1.45 | 66.48 | 138.82 | 1.58 | 58.79 | 114.82 |

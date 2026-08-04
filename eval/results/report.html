@@ -315,6 +315,19 @@
     store at <code>tensordb/</code>. 3,026 of 3,456 tensors are TensorX deltas;
     every download in this study re-verified every tensor against its
     content hash.</p>
+    <p><strong>The origin behind it</strong> (census 2026-08-04, from the store's
+    metadata DB): <code>tensordb/</code> registers <strong>2,894 models</strong>
+    (2,892 ready) whose <strong>964,011 named parameters</strong> map onto
+    <strong>742,027 unique content-addressed tensors</strong> —
+    <strong>40.1 TB physical</strong> against 45.0 TB logical, a 10.8%
+    saving from identical-tensor dedup alone (22,784 tensors are shared by
+    more than one model; avg 333 tensors/model at ~54 MB). The store is
+    uncompressed originals only — no delta encoding at this layer; that is
+    what the <code>compressed_eval/</code> hub adds (35% saved on its 9-model
+    slice). At the bucket level <code>blobs/</code> holds 1,775,896 tensor
+    objects / 71.9 TB, of which ~1.03M blobs / 31.8 TB predate the current
+    metadata DB and are unreferenced by it; everything measured here resolves
+    against the registered set.</p>
     <p>Each model was downloaded under four regimes, every run fully traced
     (per-request first-byte and body timing, decode timing, resource
     sampling):</p>
