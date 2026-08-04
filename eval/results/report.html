@@ -272,7 +272,7 @@
   TensorDex encoder (SOSP'26) and the TDN delivery network.</p>
   <div class="meta-row">
     <span>2026-08-02 · updated 08-03</span>
-    <span>72 instrumented runs · all byte-exact (XXH3 per tensor) · +15 Hugging Face baseline/traced pulls</span>
+    <span>72 instrumented runs · all byte-exact (XXH3 per tensor) · +24 Hugging Face pulls (per-model CLI e2e + traced provenance)</span>
     <span>client: t3.xlarge · us-east-1</span>
     <span>serving: i4i.2xlarge · NVMe · same VPC</span>
     <span>9 models · 3 families · 106.3 GB logical</span>
@@ -557,25 +557,27 @@
     <div class="dcard pos">
       <h4>i4i deployment <span class="tag t-new">NEW</span> <small style="color:var(--ink-3)">· VPC · NVMe</small></h4>
       <div class="tablewrap" style="margin:10px 0 0"><table>
-        <thead><tr><th style="text-align:left">model</th><th>GB</th><th>cold</th><th>warm</th><th>pre-cached†</th><th>HF traced‡</th></tr></thead>
+        <thead><tr><th style="text-align:left">model</th><th>GB</th><th>cold</th><th>warm</th><th>pre-cached†</th><th>HF CLI‡</th></tr></thead>
         <tbody>
-          <tr><td class="t">chat-doctor 3B</td><td>1.67</td><td class="best">9.9</td><td class="best">3.5</td><td>0.3%</td><td>9.8</td></tr>
-          <tr><td class="t">GSOC 3B</td><td>1.67</td><td>28.4</td><td class="best">3.5</td><td>0%</td><td>11.6</td></tr>
-          <tr><td class="t">Bangla 3B</td><td>1.77</td><td class="worst">43.2</td><td class="best">6.2</td><td>0.2%</td><td>10.5</td></tr>
-          <tr><td class="t">krx-qwen 7B</td><td>15.23</td><td class="best">117.4</td><td class="best">102.3</td><td>2.5%</td><td>82.3</td></tr>
-          <tr><td class="t">Egida-DPO 7B</td><td>15.23</td><td class="best">129.2</td><td class="best">101.8</td><td>2.1%</td><td>69.3</td></tr>
+          <tr><td class="t">chat-doctor 3B</td><td>1.67</td><td class="best">9.9</td><td class="best">3.5</td><td>0.3%</td><td>23.1</td></tr>
+          <tr><td class="t">GSOC 3B</td><td>1.67</td><td>28.4</td><td class="best">3.5</td><td>0%</td><td>23.7</td></tr>
+          <tr><td class="t">Bangla 3B</td><td>1.77</td><td class="worst">43.2</td><td class="best">6.2</td><td>0.2%</td><td>34.6</td></tr>
+          <tr><td class="t">krx-qwen 7B</td><td>15.23</td><td class="best">117.4</td><td class="best">102.3</td><td>2.5%</td><td>124.1</td></tr>
+          <tr><td class="t">Egida-DPO 7B</td><td>15.23</td><td class="best">129.2</td><td class="best">101.8</td><td>2.1%</td><td>131.1</td></tr>
           <tr><td class="t">hp-ablations 7B</td><td>15.23</td><td class="best">156.3</td><td class="best">103.0</td><td>0.2%</td><td class="worst">gated</td></tr>
-          <tr><td class="t">SimPO 9B</td><td>18.48</td><td class="best">128.3</td><td class="best">127.9</td><td>7.2%</td><td>74.7</td></tr>
-          <tr><td class="t">Tong-star 9B</td><td>18.48</td><td class="best">186.0</td><td class="best">128.1</td><td>0.3%</td><td>81.5</td></tr>
-          <tr><td class="t">Woona 9B</td><td>18.48</td><td class="best">137.4</td><td class="best">129.8</td><td>0.0%</td><td>82.6</td></tr>
+          <tr><td class="t">SimPO 9B</td><td>18.48</td><td class="best">128.3</td><td class="best">127.9</td><td>7.2%</td><td>155.6</td></tr>
+          <tr><td class="t">Tong-star 9B</td><td>18.48</td><td class="best">186.0</td><td class="best">128.1</td><td>0.3%</td><td>154.2</td></tr>
+          <tr><td class="t">Woona 9B</td><td>18.48</td><td class="best">137.4</td><td class="best">129.8</td><td>0.0%</td><td>148.3</td></tr>
         </tbody>
       </table></div>
       <p style="font-size:0.78rem; color:var(--ink-3); margin:8px 0 0">† share of served bytes
       already cache-resident from earlier runs' shared closure ancestors (client TTFB &lt; 50 ms) —
-      see the purity note. &nbsp;‡ huggingface.co, 8 parallel range-streams to /dev/null —
-      <strong>no hash verify, no disk write</strong>, so not directly comparable to the harness
-      columns (which verify every tensor and write real shards); see the incumbent-anchor analysis
-      below. "gated" = anonymous 401 — hp-ablations is private on HF; our hub serves it.</p>
+      see the purity note. &nbsp;‡ stock <code>hf download</code> per model (2026-08-04, cache wiped
+      before each run): full end-to-end <strong>with chunk verification and write to disk</strong> —
+      the like-for-like comparator to the cold/warm columns, which XXH3-verify every tensor and
+      write real shards. Every run route-traced live: all data bytes from HF's own
+      <code>us.aws.cdn.hf.co</code> fleet, none from CloudFront/S3 (see the incumbent-anchor
+      analysis). "gated" = anonymous 401 — hp-ablations is private on HF; our hub serves it.</p>
     </div>
   </div>
 
@@ -590,7 +592,7 @@
       <span class="key"><span class="swatch" style="background:var(--s3)"></span>cold · i4i</span>
       <span class="key"><span class="swatch" style="background:var(--s4); opacity:.45"></span>warm · t3 proto</span>
       <span class="key"><span class="swatch" style="background:var(--s4)"></span>warm · i4i</span>
-      <span class="key"><span class="swatch" style="background:var(--s2)"></span>Hugging Face hub (stock CLI end-to-end, 1 representative per family; transport-only traced bound in parentheses — see anchor note)</span>
+      <span class="key"><span class="swatch" style="background:var(--s2)"></span>Hugging Face hub (stock CLI end-to-end with verify + disk write, family median of per-model runs — see anchor note)</span>
     </div>
     <div class="panel">
       <div class="panel-name">llama-3.2-3B <small>· 1.7 GB · scale 0–45 s</small></div>
@@ -599,7 +601,7 @@
       <div class="brow"><span class="rlabel">cold · i4i</span><div class="track" data-tip="NEW cold — 28.4 s median, but a 9.9–43.2 s spread across three near-identical models: latency-bound small tensors, not bandwidth (see below)."><div class="bar s3" style="width:63.1%"></div><span class="val">28.4 s (9.9–43.2)</span></div></div>
       <div class="brow"><span class="rlabel">warm · t3 proto</span><div class="track" data-tip="OLD warm — 3.9 s from the server's page cache, loopback."><div class="bar s4 old" style="width:8.7%"></div><span class="val">3.9 s</span></div></div>
       <div class="brow"><span class="rlabel">warm · i4i</span><div class="track" data-tip="NEW warm — 3.5 s over a real network hop at 432–459 MB/s (NIC burst)."><div class="bar s4" style="width:7.8%"></div><span class="val">3.5 s</span></div></div>
-      <div class="brow"><span class="rlabel">Hugging Face</span><div class="track" data-tip="Stock hf CLI end-to-end on chat-doctor (verify + write to disk, one representative model — not a family median): 24.3 s. That is the apples-to-apples number against the other bars. Transport-only bound from the traced campaign (real model bytes, 8 range-streams to /dev/null, no verify/no write, family median): 10.5 s. Our warm path delivers verified bytes to disk in 3.5 s — faster than even HF's no-write bound."><div class="bar s2" style="width:54%"></div><span class="val">24.3 s (stock CLI, 1 rep; transport-only bound 10.5)</span></div></div>
+      <div class="brow"><span class="rlabel">Hugging Face</span><div class="track" data-tip="Stock hf CLI end-to-end (chunk verify + write to disk), family median of per-model runs: 23.7 s (chat-doctor 23.1, GSOC 23.7, Bangla 34.6 — Bangla is 2× the size of the others). Cache wiped before each run; every run route-traced: all data from HF's own us.aws.cdn.hf.co fleet. Our warm path delivers verified bytes to disk in 3.5 s — 6.8× faster; even HF's transport-only bound (10.5 s to /dev/null) loses to it."><div class="bar s2" style="width:52.7%"></div><span class="val">23.7 s (stock CLI e2e, median of 3)</span></div></div>
     </div>
     <div class="panel">
       <div class="panel-name">Qwen2.5-7B <small>· 15.2 GB · scale 0–290 s</small></div>
@@ -608,7 +610,7 @@
       <div class="brow"><span class="rlabel">cold · i4i</span><div class="track" data-tip="NEW cold — 129.2 s: 2.1× faster than the prototype, 1.14× of direct S3."><div class="bar s3" style="width:44.6%"></div><span class="val">129.2 s</span></div></div>
       <div class="brow"><span class="rlabel">warm · t3 proto</span><div class="track" data-tip="OLD warm — 204.4 s, EBS-bound at ~77 MB/s: slower than S3."><div class="bar s4 old" style="width:70.5%"></div><span class="val">204.4 s</span></div></div>
       <div class="brow"><span class="rlabel">warm · i4i</span><div class="track" data-tip="NEW warm — 102.3 s at 162 MB/s peaks: capped by the client's own verify+disk-write pipeline (not the NIC — see anchor note), and still beats direct S3 by 1.1×."><div class="bar s4" style="width:35.3%"></div><span class="val">102.3 s ← beats direct</span></div></div>
-      <div class="brow"><span class="rlabel">Hugging Face</span><div class="track" data-tip="Stock hf CLI end-to-end on Egida (verify + write to disk, one representative model — not a family median): 125.6 s, slower than our warm 102.3 s. Transport-only bound from the traced campaign (real model bytes to /dev/null, no verify/no write; median of the 2 accessible Qwens — KPEP 82.3, Egida 69.3; hp-ablations is gated 401): 75.8 s. Xet moved ~10% fewer bytes than written (chunk dedup)."><div class="bar s2" style="width:43.3%"></div><span class="val">125.6 s (stock CLI, 1 rep; transport-only bound 75.8; 1 model gated)</span></div></div>
+      <div class="brow"><span class="rlabel">Hugging Face</span><div class="track" data-tip="Stock hf CLI end-to-end (chunk verify + write to disk), midpoint of the 2 accessible Qwens: 127.6 s (KPEP 124.1, Egida 131.1; hp-ablations is gated 401 on HF — our hub serves it). Cache wiped before each run; route-traced: all data from us.aws.cdn.hf.co. Slower than our warm 102.3 s. Xet moved ~10% fewer bytes than written (chunk dedup)."><div class="bar s2" style="width:44%"></div><span class="val">127.6 s (stock CLI e2e, median of 2; 1 model gated)</span></div></div>
     </div>
     <div class="panel">
       <div class="panel-name">gemma-2-9B <small>· 18.5 GB · scale 0–420 s</small></div>
@@ -617,7 +619,7 @@
       <div class="brow"><span class="rlabel">cold · i4i</span><div class="track" data-tip="NEW cold — 137.4 s: 2.9× faster than the prototype, at direct-S3 parity. Woona's 26.9 GB depth-2 closure materialized at 128 MB/s. SimPO materialized faster than the client NIC drains: its cold equals its warm."><div class="bar s3" style="width:32.7%"></div><span class="val">137.4 s ← parity</span></div></div>
       <div class="brow"><span class="rlabel">warm · t3 proto</span><div class="track" data-tip="OLD warm — 258.4 s, 1.8× slower than direct S3. The finding that motivated the i4i."><div class="bar s4 old" style="width:61.5%"></div><span class="val">258.4 s</span></div></div>
       <div class="brow"><span class="rlabel">warm · i4i</span><div class="track" data-tip="NEW warm — 128.1 s at 136–143 MB/s: capped by the client's verify+disk-write pipeline, not the NIC (transport-only probe: 590 MiB/s from this cache). The cache tier is not the limiter."><div class="bar s4" style="width:30.5%"></div><span class="val">128.1 s ← beats direct</span></div></div>
-      <div class="brow"><span class="rlabel">Hugging Face</span><div class="track" data-tip="Stock hf CLI end-to-end on SimPO (verify + write to disk, one representative model — not a family median): 149.7 s, slower than our warm 128.1 s. Transport-only bound from the traced campaign (real model bytes to /dev/null, no verify/no write, family median SimPO 74.7 / Tong 81.5 / Woona 82.6): 81.5 s. Same-window transport-only: i4i cache 590 MiB/s vs HF bridge 249 MiB/s."><div class="bar s2" style="width:35.6%"></div><span class="val">149.7 s (stock CLI, 1 rep; transport-only bound 81.5)</span></div></div>
+      <div class="brow"><span class="rlabel">Hugging Face</span><div class="track" data-tip="Stock hf CLI end-to-end (chunk verify + write to disk), family median of per-model runs: 154.2 s (Woona 148.3, Tong 154.2, SimPO 155.6). Cache wiped before each run; route-traced: all data from us.aws.cdn.hf.co. Slower than our warm 128.1 s and our cold 137.4 s. Same-window transport-only: i4i cache 590 MiB/s vs HF bridge 249 MiB/s."><div class="bar s2" style="width:36.7%"></div><span class="val">154.2 s (stock CLI e2e, median of 3)</span></div></div>
     </div>
   </div>
 
@@ -650,6 +652,23 @@
     exist but were never contacted for anonymous downloads (the read token
     says <code>hfCdnTier: unauthenticated</code> — authenticated tiers may
     route differently).</p>
+    <p><strong>Full CLI campaign (2026-08-04), the like-for-like column.</strong>
+    Because the traced campaign skips verify and disk, its numbers were the
+    wrong thing to sit next to harness runs in the per-model table. Rerun:
+    stock <code>hf download</code> on <strong>all nine models</strong>,
+    cache wiped before each run — full end-to-end with chunk verification
+    and EBS writes, which is exactly what our harness columns pay. Route
+    tracing rode along without touching the download path (the CLI
+    process's TCP peers sampled at 4 Hz + NIC rx deltas): every run pulled
+    data only from <code>us.aws.cdn.hf.co</code>, confirming the provenance
+    finding at full scale (one pypi.org version-check connection identified
+    and excluded; zero model bytes). Results: 3Bs 23.1 / 23.7 / 34.6 s
+    (Bangla is 2× the size), Qwens 124.1 / 131.1 s (hp-ablations gated),
+    gemmas 148.3 / 154.2 / 155.6 s — the three original representatives
+    reproduced within 2–5%, and xet's ~10% wire dedup held on every big
+    model. These are the numbers in the per-model table and the bars above;
+    the traced campaign's role is now provenance + transport-only bound,
+    nothing else. Raw: <code>eval/results/hf_cli_full/runs.jsonl</code>.</p>
     <p><strong>The paired probe that corrected this report.</strong> The
     traced numbers (69–83 s on big models) beat our harness warm numbers
     (102–130 s) — but the tracer skips verification and disk. Back-to-back
@@ -665,7 +684,9 @@
     ~135 MB/s harness ceiling is the client's own hash-verify +
     EBS-shard-write pipeline; burst bandwidth was available all along.
     Like-for-like verdicts: <em>byte-exact-to-disk tier</em> — TStore warm
-    beats the HF CLI and direct S3 on every family (7× on the 3B);
+    beats the HF CLI and direct S3 on every family, per-model on all
+    eight HF-accessible models (6.8× on the 3B family median, 3.5 s vs
+    23.7 s);
     <em>transport-only tier</em> — the i4i cache is 2.4× faster than HF's
     bridge to the same client. Xet's wire dedup (8–10% fewer bytes on the
     wire) and our 35% at-rest saving are different layers — stackable, not
@@ -1187,13 +1208,17 @@
   i4i campaign: one full clear then natural first touch, demand-miss,
   client-parallel ×10, with per-run pre-cached-bytes annotations from the
   closure-overlap discovery (§2b). Medians over 2 reps. Hugging Face
-  baselines, same client, same day: (a) stock hf CLI (huggingface_hub
-  1.26.0, hf_xet), weights only, verify+write, 3 representatives; (b)
-  traced campaign over all 9 models — manual redirect following with
+  baselines, same client: (a) stock hf CLI (huggingface_hub 1.26.0,
+  hf_xet), weights only, verify+write, 3 representatives (2026-08-03);
+  (b) traced campaign over all 9 models — manual redirect following with
   provenance headers, 128 MiB range-parts × 8 streams to /dev/null (no
   verify/write), plus edge-warmth re-reps and a same-window paired probe
-  (i4i transport-only 590 MiB/s vs HF bridge 249 MiB/s). Raw traces
-  eval/results/hf_traced/, summary eval/results/hf_baseline.json.</p>
+  (i4i transport-only 590 MiB/s vs HF bridge 249 MiB/s); (c) full CLI
+  campaign over all 9 models (2026-08-04) — verify+write end-to-end,
+  cache wiped per run, each run route-traced via live TCP peer sampling
+  + NIC rx deltas: this is the per-model HF column and the chart bars.
+  Raw traces eval/results/hf_traced/ and eval/results/hf_cli_full/,
+  summary eval/results/hf_baseline.json.</p>
 </footer>
 
 </div>

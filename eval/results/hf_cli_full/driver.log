@@ -1,0 +1,9 @@
+AhmedSSoliman/llama-3.2-3b-chat-doctor: rc=0 23.1s 1.76 GiB disk, 1.79 GiB wire, routes={'cas-server': 1290, 'hf-own-cdn': 1120, 'hub-cloudfront': 852, 'other': 86}
+KPEP/krx-qwen-2.5-7b-v1.4.4: rc=0 124.1s 14.19 GiB disk, 12.73 GiB wire, routes={'cas-server': 5196, 'hub-cloudfront': 4372, 'hf-own-cdn': 7818, 'other': 466}
+princeton-nlp/gemma-2-9b-it-SimPO: rc=0 155.6s 17.23 GiB disk, 15.55 GiB wire, routes={'hf-own-cdn': 15102, 'hub-cloudfront': 5293, 'cas-server': 8335, 'other': 583}
+Gabbar01/llama-3.2-3b-GSOC-DATASET: rc=0 23.7s 1.56 GiB disk, 1.61 GiB wire, routes={'hub-cloudfront': 349, 'cas-server': 261, 'hf-own-cdn': 1080, 'other': 87}
+HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO: rc=0 131.1s 14.20 GiB disk, 12.73 GiB wire, routes={'cas-server': 6376, 'hf-own-cdn': 8811, 'hub-cloudfront': 4548, 'other': 493}
+TongZheng1999/gemma-2-9b-it-star-truth_table-OP-final_1-2-3Rounds-iter-1: rc=0 154.2s 17.25 GiB disk, 15.56 GiB wire, routes={'hub-cloudfront': 5398, 'hf-own-cdn': 10063, 'cas-server': 7464, 'other': 581}
+BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1: rc=0 34.6s 3.31 GiB disk, 2.97 GiB wire, routes={'cas-server': 1143, 'hub-cloudfront': 1019, 'hf-own-cdn': 2027, 'other': 128}
+mlfoundations-dev/hp_ablations_qwen_adambeta2_0.95_dcftv1.2: rc=1 0.6s 0.00 GiB disk, 0.00 GiB wire, routes={'hub-cloudfront': 1}
+AlexBefest/WoonaV1.2-9b: rc=0 148.3s 17.24 GiB disk, 15.63 GiB wire, routes={'hub-cloudfront': 6050, 'hf-own-cdn': 9256, 'cas-server': 6624, 'other': 558}

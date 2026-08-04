@@ -40,36 +40,48 @@ client streams against the fixed keepalive path.
 
 ### NEW — i4i deployment (dedicated server, NVMe, over network)
 
-| model | logical GB | srv cold | srv warm | cold pre-cached bytes | HF traced‡ |
+| model | logical GB | srv cold | srv warm | cold pre-cached bytes | HF CLI e2e‡ |
 |---|---|---|---|---|---|
-| AhmedSSoliman/llama-3.2-3b-chat-doctor | 1.67 | 9.9 | 3.5 | 0.3% | 9.8 |
-| Gabbar01/llama-3.2-3b-GSOC-DATASET | 1.67 | 28.4 | 3.5 | 0% (ran first) | 11.6 |
-| BanglaLLM/BanglaLLama-3.2-3b | 1.77 | 43.2 | 6.2 | 0.2% | 10.5 |
-| KPEP/krx-qwen-2.5-7b-v1.4.4 | 15.23 | 117.4 | 102.3 | 2.5% | 82.3 |
-| HPAI-BSC/Qwen2.5-7B-Egida-DPO | 15.23 | 129.2 | 101.8 | 2.1% | 69.3 |
+| AhmedSSoliman/llama-3.2-3b-chat-doctor | 1.67 | 9.9 | 3.5 | 0.3% | 23.1 |
+| Gabbar01/llama-3.2-3b-GSOC-DATASET | 1.67 | 28.4 | 3.5 | 0% (ran first) | 23.7 |
+| BanglaLLM/BanglaLLama-3.2-3b | 1.77 | 43.2 | 6.2 | 0.2% | 34.6 |
+| KPEP/krx-qwen-2.5-7b-v1.4.4 | 15.23 | 117.4 | 102.3 | 2.5% | 124.1 |
+| HPAI-BSC/Qwen2.5-7B-Egida-DPO | 15.23 | 129.2 | 101.8 | 2.1% | 131.1 |
 | mlfoundations-dev/hp_ablations_qwen | 15.23 | 156.3 | 103.0 | 0.2% | gated (401) |
-| princeton-nlp/gemma-2-9b-it-SimPO | 18.48 | 128.3 | 127.9 | 7.2% | 74.7 |
-| TongZheng1999/gemma-2-9b-star | 18.48 | 186.0 | 128.1 | 0.3% | 81.5 |
-| AlexBefest/WoonaV1.2-9b | 18.48 | 137.4 | 129.8 | 0.0% | 82.6 |
+| princeton-nlp/gemma-2-9b-it-SimPO | 18.48 | 128.3 | 127.9 | 7.2% | 155.6 |
+| TongZheng1999/gemma-2-9b-star | 18.48 | 186.0 | 128.1 | 0.3% | 154.2 |
+| AlexBefest/WoonaV1.2-9b | 18.48 | 137.4 | 129.8 | 0.0% | 148.3 |
 
 (pre-cached bytes: share of served bytes that were already resident from
 earlier runs' shared ancestors, measured from client TTFB<50 ms — see §4.
-‡ HF traced = huggingface.co download, 8 parallel range-streams to
-/dev/null — NO hash verify, NO disk write, so NOT directly comparable to
-the harness columns, which verify every tensor and write real shards;
-see §6 for the like-for-like analysis. mlfoundations is gated/private on
-HF (anonymous 401) — our hub serves it; HF cannot.)
+‡ HF CLI e2e = stock `hf download` (hf_xet backend) run per model on the
+same client, 2026-08-04, local HF cache wiped before each run: full
+end-to-end WITH chunk hash verification AND write to EBS disk — the
+like-for-like comparator to the srv columns, which XXH3-verify every
+tensor and write real shards. Each run was route-traced live (TCP peer
+sampling of the CLI process + NIC rx accounting): all data bytes from
+us.aws.cdn.hf.co, chunk metadata from cas-server, control plane on
+CloudFront, zero CloudFront-xet connections; wire bytes ~10% below disk
+bytes on 7B/9B (xet dedup). Raw records:
+eval/results/hf_cli_full/runs.jsonl. The earlier transport-only traced
+numbers (range-streams to /dev/null, no verify/no write) remain in §6a
+as HF's best-case transport bound only. mlfoundations is gated/private
+on HF (anonymous 401, re-confirmed in this campaign) — our hub serves
+it; HF cannot.)
 
 ### Family medians, side by side
 
-| family | OLD cold | NEW cold | OLD warm | NEW warm | ref: direct S3 (td) | ref: client decode (td_c) |
-|---|---|---|---|---|---|---|
-| llama-3.2-3B | 25.8 | 28.4 | 3.9 | 3.5 | 12.4 | 18.8 |
-| Qwen2.5-7B | 276.7 | 129.2 | 204.4 | 102.3 | 113.1 | 138.3 |
-| gemma-2-9B | 397.8 | 137.4 | 258.4 | 128.1 | 141.3 | 158.0 |
+| family | OLD cold | NEW cold | OLD warm | NEW warm | ref: direct S3 (td) | ref: client decode (td_c) | ref: HF CLI e2e |
+|---|---|---|---|---|---|---|---|
+| llama-3.2-3B | 25.8 | 28.4 | 3.9 | 3.5 | 12.4 | 18.8 | 23.7 |
+| Qwen2.5-7B | 276.7 | 129.2 | 204.4 | 102.3 | 113.1 | 138.3 | 127.6 |
+| gemma-2-9B | 397.8 | 137.4 | 258.4 | 128.1 | 141.3 | 158.0 | 154.2 |
 
 (td/td_c reference columns are Stage 1 t3 client-path baselines,
-unchanged by this campaign; included for ratio context only.)
+unchanged by this campaign; included for ratio context only. HF CLI
+column = family median of the per-model end-to-end `hf download` runs
+above — verify + disk write, same tier as every other column; Qwen is
+the midpoint of the 2 accessible models, mlfoundations being gated.)
 
 ## 3. What changed and why
 
@@ -263,3 +275,51 @@ Reading (revised after §6a/6b):
 4. Protocol caveats: 1–2 reps, public service whose performance varies
    by time and load; our tier is private single-tenant — a sanity
    anchor against the incumbent, not a controlled A/B.
+
+### 6d. Full CLI campaign (2026-08-04): all nine models, verify + write, route-traced per run
+
+The 3-representative baseline above left the per-model comparison
+resting on transport-only traced numbers — an apples-to-oranges column
+against harness runs that verify and write. Rerun: stock `hf download`
+on ALL nine models (family-interleaved order, HF cache wiped before
+each run so every run pays full download + xet verify + EBS write),
+with route tracing that does not perturb the download — the CLI
+process's established TCP peers sampled at 4 Hz (`ss -tnp`, pid-
+filtered) and classified against resolved HF/CDN hostnames, plus NIC
+rx-byte deltas. Script: `eval/scripts/hf_cli_campaign.py`; raw:
+`eval/results/hf_cli_full/runs.jsonl`.
+
+| model | disk GiB | e2e s | disk MiB/s | wire GiB | routes seen |
+|---|---|---|---|---|---|
+| chat-doctor 3B | 1.76 | 23.1 | 78 | 1.79 | hf-own-cdn, cas-server, hub-CF |
+| GSOC 3B | 1.56 | 23.7 | 67 | 1.61 | same |
+| Bangla 3B | 3.31 | 34.6 | 98 | 2.97 | same |
+| KPEP 7B | 14.19 | 124.1 | 117 | 12.73 | same |
+| Egida 7B | 14.20 | 131.1 | 111 | 12.73 | same |
+| mlfoundations 7B | — | gated (401) | — | — | hub-CF only (1 probe) |
+| SimPO 9B | 17.23 | 155.6 | 113 | 15.55 | same |
+| Tong 9B | 17.25 | 154.2 | 115 | 15.56 | same |
+| Woona 9B | 17.24 | 148.3 | 119 | 15.63 | same |
+
+Findings:
+
+1. **Reproducibility**: the three original representatives came back
+   within 2–5% (chat-doctor 23.1 vs 24.3; Egida 131.1 vs 125.6; SimPO
+   155.6 vs 149.7/154.1-warm-control) — the CLI numbers are stable,
+   consistent with the client-side-limited conclusion of §6b.
+2. **Route confirmation at full scale**: every successful run pulled
+   data exclusively from `us.aws.cdn.hf.co` (HF's own fleet), chunk
+   metadata from `cas-server.xethub.hf.co`, control plane on
+   huggingface.co CloudFront; the CloudFront-fronted xet hosts and
+   `cdn-lfs-us-1.hf.co` were never contacted. One sideband was
+   identified and excluded: a single persistent connection to
+   pypi.org (Fastly, 151.101.x.223 — cert CN=www.python.org), the
+   CLI's own package-version check; zero model bytes.
+3. **Xet wire dedup holds at ~10%** on every 7B/9B (e.g. KPEP wrote
+   14.19 GiB from 12.73 GiB on the wire); the 3Bs show none (wire
+   slightly exceeds disk — protocol overhead).
+4. **Bangla's 34.6 s** reflects its size (3.31 GiB — twice the other
+   3Bs), not a slower path (98 MiB/s, best of the 3Bs).
+5. These numbers are the `HF CLI e2e‡` column in §2 and supersede the
+   traced column there; the traced campaign remains §6a's provenance
+   instrument and transport-only bound.

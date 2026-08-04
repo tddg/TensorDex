@@ -1,115 +1,189 @@
 {
-  "date": "2026-08-03",
-  "client": "t3.xlarge us-east-1 (same client as all campaigns)",
-  "campaigns": {
-    "cli": {
-      "tool": "hf download (huggingface_hub 1.26.0, hf_xet backend), weights only, fresh cache, writes to disk, 1 rep",
-      "runs": [
-        {
-          "model": "AhmedSSoliman/llama-3.2-3b-chat-doctor",
-          "GiB": 1.56,
-          "e2e_s": 24.35,
-          "nic_rx_MiB": 1651,
-          "MiBps": 65.6
-        },
-        {
-          "model": "HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO",
-          "GiB": 14.19,
-          "e2e_s": 125.58,
-          "nic_rx_MiB": 13026,
-          "MiBps": 115.7
-        },
-        {
-          "model": "princeton-nlp/gemma-2-9b-it-SimPO",
-          "GiB": 17.21,
-          "e2e_s": 149.67,
-          "nic_rx_MiB": 15917,
-          "MiBps": 117.7
-        }
-      ],
-      "note": "nic_rx < bytes written = Xet chunk dedup/compression on the wire (~8-10% on 7B/9B)"
+ "date": "2026-08-03",
+ "client": "t3.xlarge us-east-1 (same client as all campaigns)",
+ "campaigns": {
+  "cli": {
+   "tool": "hf download (huggingface_hub 1.26.0, hf_xet backend), weights only, fresh cache, writes to disk, 1 rep",
+   "runs": [
+    {
+     "model": "AhmedSSoliman/llama-3.2-3b-chat-doctor",
+     "GiB": 1.56,
+     "e2e_s": 24.35,
+     "nic_rx_MiB": 1651,
+     "MiBps": 65.6
     },
-    "traced": {
-      "tool": "eval/scripts/hf_trace_download.py: /resolve redirects followed manually, 128 MiB range-parts, 8 streams, streamed to /dev/null (NO disk write, NO hash verify), per-request provenance headers recorded",
-      "runs": [
-        {
-          "model": "AhmedSSoliman/llama-3.2-3b-chat-doctor",
-          "GiB": 1.56,
-          "e2e_s": 9.8,
-          "MiBps": 163,
-          "rep2_s": 8.4
-        },
-        {
-          "model": "Gabbar01/llama-3.2-3b-GSOC-DATASET",
-          "GiB": 1.56,
-          "e2e_s": 11.6,
-          "MiBps": 138
-        },
-        {
-          "model": "BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1",
-          "GiB": 1.65,
-          "e2e_s": 10.5,
-          "MiBps": 160
-        },
-        {
-          "model": "KPEP/krx-qwen-2.5-7b-v1.4.4",
-          "GiB": 14.19,
-          "e2e_s": 82.3,
-          "MiBps": 177
-        },
-        {
-          "model": "HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO",
-          "GiB": 14.19,
-          "e2e_s": 69.3,
-          "MiBps": 210,
-          "rep2_s": 65.1
-        },
-        {
-          "model": "mlfoundations-dev/hp_ablations_qwen_adambeta2_0.95_dcftv1.2",
-          "error": "HTTP 401 - repo gated/private on HF; not anonymously downloadable (our hub serves it)"
-        },
-        {
-          "model": "princeton-nlp/gemma-2-9b-it-SimPO",
-          "GiB": 17.21,
-          "e2e_s": 74.7,
-          "MiBps": 236,
-          "rep2_s": 85.3
-        },
-        {
-          "model": "TongZheng1999/gemma-2-9b-it-star-truth_table-OP-final_1-2-3Rounds-iter-1",
-          "GiB": 17.21,
-          "e2e_s": 81.5,
-          "MiBps": 216
-        },
-        {
-          "model": "AlexBefest/WoonaV1.2-9b",
-          "GiB": 17.21,
-          "e2e_s": 82.6,
-          "MiBps": 213
-        }
-      ]
+    {
+     "model": "HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO",
+     "GiB": 14.19,
+     "e2e_s": 125.58,
+     "nic_rx_MiB": 13026,
+     "MiBps": 115.7
     },
-    "provenance": {
-      "data_path": "100% of 449 data requests served by us.aws.cdn.hf.co = HF's OWN CDN/Xet bridge (x-hf-cdn-pop: aws-us-east-1). NOT CloudFront (no cloudfront.net CNAME, no Via/X-Cache; plain A records to EC2 us-east-1). NOT direct S3 (S3 origin hidden behind the bridge).",
-      "control_plane": "huggingface.co /resolve hop IS CloudFront-fronted; every redirect was 'X-Cache: Miss from cloudfront' (per-request signed URLs, uncacheable by design), POP IAD55.",
-      "per_stream": {
-        "ttfb_ms_p50": 658,
-        "ttfb_ms_p95": 1201,
-        "MiBps_p50": 28,
-        "MiBps_p5": 18,
-        "MiBps_p95": 63
-      },
-      "edge_warmth": "rep2 vs rep1 on 3 representatives: TTFB 498 vs 640 ms, per-stream 32 vs 28 MiB/s - mild (~10-20%), consistent with a large always-warm regional fleet, not a thin edge cache over S3.",
-      "cli_route_equivalence": "Verified by observing a live CLI download's TCP peers (ss sampling) plus the xet-read-token API: the CLI gets casUrl=cas-server.xethub.hf.co (EC2, chunk metadata) and pulls chunk DATA from us.aws.cdn.hf.co - the SAME fleet the /resolve tracer hit. The CloudFront-fronted xet hosts (transfer/cas-bridge.xethub.hf.co, Server: CloudFront, POP IAD55) exist but were NOT contacted for this anonymous download; the token carries hfCdnTier=unauthenticated, so authenticated/other tiers may route differently."
-    },
-    "paired_probe_same_window": {
-      "i4i_warm_harness_SimPO_s": 130.8,
-      "hf_traced_SimPO_s": 70.8,
-      "i4i_transport_only_curl_MiBps": 590,
-      "hf_traced_MiBps": 249,
-      "conclusion": "Harness numbers (both ours and HF CLI) are capped ~135 MiB/s by the CLIENT's verify + EBS-write pipeline, not the NIC (burst was active: 590 MiB/s receive demonstrated). Transport-only, the i4i cache is 2.4x faster than HF's bridge to the same client.",
-      "cli_warm_rerun_SimPO_s": 154.1,
-      "cli_warm_rerun_note": "Stock CLI re-run on SimPO AFTER the bridge had served it in full 4x within the hour (maximally warm): 154.1 s vs the original 149.7 s. Cache state contributes nothing measurable to CLI numbers - the CLI is client-side limited (chunk verify + disk writes + its own concurrency). Rules out the 'first run was cold origin' interpretation."
+    {
+     "model": "princeton-nlp/gemma-2-9b-it-SimPO",
+     "GiB": 17.21,
+     "e2e_s": 149.67,
+     "nic_rx_MiB": 15917,
+     "MiBps": 117.7
     }
+   ],
+   "note": "nic_rx < bytes written = Xet chunk dedup/compression on the wire (~8-10% on 7B/9B)"
+  },
+  "traced": {
+   "tool": "eval/scripts/hf_trace_download.py: /resolve redirects followed manually, 128 MiB range-parts, 8 streams, streamed to /dev/null (NO disk write, NO hash verify), per-request provenance headers recorded",
+   "runs": [
+    {
+     "model": "AhmedSSoliman/llama-3.2-3b-chat-doctor",
+     "GiB": 1.56,
+     "e2e_s": 9.8,
+     "MiBps": 163,
+     "rep2_s": 8.4
+    },
+    {
+     "model": "Gabbar01/llama-3.2-3b-GSOC-DATASET",
+     "GiB": 1.56,
+     "e2e_s": 11.6,
+     "MiBps": 138
+    },
+    {
+     "model": "BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1",
+     "GiB": 1.65,
+     "e2e_s": 10.5,
+     "MiBps": 160
+    },
+    {
+     "model": "KPEP/krx-qwen-2.5-7b-v1.4.4",
+     "GiB": 14.19,
+     "e2e_s": 82.3,
+     "MiBps": 177
+    },
+    {
+     "model": "HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO",
+     "GiB": 14.19,
+     "e2e_s": 69.3,
+     "MiBps": 210,
+     "rep2_s": 65.1
+    },
+    {
+     "model": "mlfoundations-dev/hp_ablations_qwen_adambeta2_0.95_dcftv1.2",
+     "error": "HTTP 401 - repo gated/private on HF; not anonymously downloadable (our hub serves it)"
+    },
+    {
+     "model": "princeton-nlp/gemma-2-9b-it-SimPO",
+     "GiB": 17.21,
+     "e2e_s": 74.7,
+     "MiBps": 236,
+     "rep2_s": 85.3
+    },
+    {
+     "model": "TongZheng1999/gemma-2-9b-it-star-truth_table-OP-final_1-2-3Rounds-iter-1",
+     "GiB": 17.21,
+     "e2e_s": 81.5,
+     "MiBps": 216
+    },
+    {
+     "model": "AlexBefest/WoonaV1.2-9b",
+     "GiB": 17.21,
+     "e2e_s": 82.6,
+     "MiBps": 213
+    }
+   ]
+  },
+  "provenance": {
+   "data_path": "100% of 449 data requests served by us.aws.cdn.hf.co = HF's OWN CDN/Xet bridge (x-hf-cdn-pop: aws-us-east-1). NOT CloudFront (no cloudfront.net CNAME, no Via/X-Cache; plain A records to EC2 us-east-1). NOT direct S3 (S3 origin hidden behind the bridge).",
+   "control_plane": "huggingface.co /resolve hop IS CloudFront-fronted; every redirect was 'X-Cache: Miss from cloudfront' (per-request signed URLs, uncacheable by design), POP IAD55.",
+   "per_stream": {
+    "ttfb_ms_p50": 658,
+    "ttfb_ms_p95": 1201,
+    "MiBps_p50": 28,
+    "MiBps_p5": 18,
+    "MiBps_p95": 63
+   },
+   "edge_warmth": "rep2 vs rep1 on 3 representatives: TTFB 498 vs 640 ms, per-stream 32 vs 28 MiB/s - mild (~10-20%), consistent with a large always-warm regional fleet, not a thin edge cache over S3.",
+   "cli_route_equivalence": "Verified by observing a live CLI download's TCP peers (ss sampling) plus the xet-read-token API: the CLI gets casUrl=cas-server.xethub.hf.co (EC2, chunk metadata) and pulls chunk DATA from us.aws.cdn.hf.co - the SAME fleet the /resolve tracer hit. The CloudFront-fronted xet hosts (transfer/cas-bridge.xethub.hf.co, Server: CloudFront, POP IAD55) exist but were NOT contacted for this anonymous download; the token carries hfCdnTier=unauthenticated, so authenticated/other tiers may route differently."
+  },
+  "paired_probe_same_window": {
+   "i4i_warm_harness_SimPO_s": 130.8,
+   "hf_traced_SimPO_s": 70.8,
+   "i4i_transport_only_curl_MiBps": 590,
+   "hf_traced_MiBps": 249,
+   "conclusion": "Harness numbers (both ours and HF CLI) are capped ~135 MiB/s by the CLIENT's verify + EBS-write pipeline, not the NIC (burst was active: 590 MiB/s receive demonstrated). Transport-only, the i4i cache is 2.4x faster than HF's bridge to the same client.",
+   "cli_warm_rerun_SimPO_s": 154.1,
+   "cli_warm_rerun_note": "Stock CLI re-run on SimPO AFTER the bridge had served it in full 4x within the hour (maximally warm): 154.1 s vs the original 149.7 s. Cache state contributes nothing measurable to CLI numbers - the CLI is client-side limited (chunk verify + disk writes + its own concurrency). Rules out the 'first run was cold origin' interpretation."
+  },
+  "cli_full": {
+   "date": "2026-08-04",
+   "tool": "hf download (huggingface_hub 1.26.0, hf_xet backend), HF cache wiped before each run: full e2e with chunk verify + EBS disk write",
+   "route_tracing": "per-run live TCP peer sampling of the CLI process (ss -tnp, pid-filtered, 4 Hz) + NIC rx deltas; all data bytes from us.aws.cdn.hf.co, chunk metadata cas-server.xethub.hf.co, control plane huggingface.co CloudFront; zero CloudFront-xet or cdn-lfs connections; one pypi.org (Fastly) version-check connection identified and excluded (zero model bytes)",
+   "family_medians_e2e_s": {
+    "llama-3.2-3B": 23.7,
+    "Qwen2.5-7B": 127.6,
+    "gemma-2-9B": 154.2
+   },
+   "note": "supersedes the transport-only traced numbers as the like-for-like per-model HF column; reproduces the 3-rep cli campaign within 2-5%",
+   "raw": "eval/results/hf_cli_full/runs.jsonl",
+   "runs": [
+    {
+     "model": "AhmedSSoliman/llama-3.2-3b-chat-doctor",
+     "e2e_s": 23.14,
+     "disk_GiB": 1.76,
+     "wire_GiB": 1.79,
+     "disk_MiBps": 77.8
+    },
+    {
+     "model": "KPEP/krx-qwen-2.5-7b-v1.4.4",
+     "e2e_s": 124.09,
+     "disk_GiB": 14.19,
+     "wire_GiB": 12.73,
+     "disk_MiBps": 117.1
+    },
+    {
+     "model": "princeton-nlp/gemma-2-9b-it-SimPO",
+     "e2e_s": 155.56,
+     "disk_GiB": 17.23,
+     "wire_GiB": 15.55,
+     "disk_MiBps": 113.4
+    },
+    {
+     "model": "Gabbar01/llama-3.2-3b-GSOC-DATASET",
+     "e2e_s": 23.69,
+     "disk_GiB": 1.56,
+     "wire_GiB": 1.61,
+     "disk_MiBps": 67.4
+    },
+    {
+     "model": "HPAI-BSC/Qwen2.5-7B-Instruct-Egida-DPO",
+     "e2e_s": 131.11,
+     "disk_GiB": 14.2,
+     "wire_GiB": 12.73,
+     "disk_MiBps": 110.9
+    },
+    {
+     "model": "TongZheng1999/gemma-2-9b-it-star-truth_table-OP-final_1-2-3Rounds-iter-1",
+     "e2e_s": 154.24,
+     "disk_GiB": 17.25,
+     "wire_GiB": 15.56,
+     "disk_MiBps": 114.5
+    },
+    {
+     "model": "BanglaLLM/BanglaLLama-3.2-3b-unolp-culturax-base-v0.0.1",
+     "e2e_s": 34.57,
+     "disk_GiB": 3.31,
+     "wire_GiB": 2.97,
+     "disk_MiBps": 97.9
+    },
+    {
+     "model": "mlfoundations-dev/hp_ablations_qwen_adambeta2_0.95_dcftv1.2",
+     "error": "HTTP 401 - gated/private on HF (re-confirmed 2026-08-04)"
+    },
+    {
+     "model": "AlexBefest/WoonaV1.2-9b",
+     "e2e_s": 148.34,
+     "disk_GiB": 17.24,
+     "wire_GiB": 15.63,
+     "disk_MiBps": 119.0
+    }
+   ]
   }
+ }
 }
