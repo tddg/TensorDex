@@ -105,14 +105,20 @@ the midpoint of the 2 accessible models, mlfoundations being gated.)
    (concurrent clients) or a beefier client.
 3. **llama-family cold is the one soft spot: 9.9 / 28.4 / 43.2 s across
    three near-identical 1.7 GB models** (vs 12.4 s direct S3). All
-   three are >99% miss-served, so this is NOT cache pollution. The 3B
-   workload is latency-bound (≈400 tensors, ~4.5 MB avg: per-miss
-   S3-GET + hash + write round trips dominate; nothing pipelines).
-   Variance suspects, needing server-side log correlation: first-run
-   effects (Gabbar ran seconds after the materializer restart) and
-   spill behavior around the >512 MB shared embedding chains
-   (per-run spill isolation from 5b9f5fb re-materializes shared spilled
-   bases instead of reusing a sibling's). Open item.
+   three are >99% miss-served, so this is NOT cache pollution.
+   *LOCALIZED by per-tensor latency CDFs (fig-cdf in report.html,
+   generator eval/scripts/gen_tensor_cdfs.py): the spread is NOT in the
+   distribution body — cold p50 is a uniform 206–228 ms across all
+   three — it is the single 752 MiB embedding tensor per model:
+   chat-doctor's served in 1.8 s, GSOC's in 21.5 s, and Bangla has TWO
+   (tied input/output embeddings) at 15.2 s and 20.0 s.* That points
+   squarely at the >512 MB demand-budget spill path (per-run spill
+   isolation from 5b9f5fb re-materializes shared spilled bases instead
+   of reusing a sibling's; Gabbar also ran seconds after the
+   materializer restart). Server-side log correlation for those four
+   tensor requests is the remaining step; candidate fix unchanged
+   (tid-scoped refcounted spill). Open item, now with the client-side
+   evidence pinned to specific tensors.
 
 ## 4. Protocol caveat discovered post-run: closures DO overlap
 
