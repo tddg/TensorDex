@@ -1,5 +1,10 @@
 # Compressed vs uncompressed download (single client)
 
+> **2026-08-05:** the whole origin store is now delta-compressed —
+> 581k TensorX deltas at `s3://tensor-tingfeng/compressed_full/`
+> (60.9% reduction physical / 65.2% logical; FM++ 70.5% claim validated).
+> Full campaign report: [FULL_HUB_CAMPAIGN.md](FULL_HUB_CAMPAIGN.md).
+
 Medians over reps (min reps per cell: 1). tensordex = uncompressed dedup store (`tensordb/`), tensordex_c = delta-compressed hub (`compressed_eval/`).
 
 ## Origin store census (`s3://tensor-tingfeng/tensordb/`, measured 2026-08-04)
