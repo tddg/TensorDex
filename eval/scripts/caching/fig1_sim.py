@@ -327,9 +327,11 @@ def run_cell(argsp):
     m = dict(pulls=0, req=0, hit=0, req_bytes=0.0, hit_bytes=0.0,
              delta_only=0.0, base_bytes=0.0, delta_with_base=0.0,
              raw_bytes=0.0, decode_s=0.0, base_logical=0, base_physical=0)
+    pull_origin, pull_decode = [], []       # per-pull, for latency quantiles
 
     for k, man in enumerate(trace):
         live = k >= warmup
+        p_origin = p_decode = 0.0
         fetched = set()
         for i in man:
             i = int(i)
@@ -346,6 +348,7 @@ def run_cell(argsp):
             if b == -1:                                     # raw miss
                 if live:
                     m["raw_bytes"] += L[i]
+                    p_origin += L[i]
                 if isinstance(cache, GDSF):
                     cache.note_miss_cost(i, L[i])
                 cache.on_serve(i, L[i])
@@ -354,6 +357,8 @@ def run_cell(argsp):
             base_resident = b in cache.res or b in fetched
             if live:
                 m["decode_s"] += c[i]
+                p_decode += c[i]
+                p_origin += d[i]
                 m["base_logical"] += 1
                 if base_resident:
                     m["delta_only"] += d[i]
@@ -366,12 +371,15 @@ def run_cell(argsp):
                 if live:
                     m["base_bytes"] += L[b]
                     m["base_physical"] += 1
+                    p_origin += L[b]
                 cache.on_base_fetch(b, L[b])
             if isinstance(cache, GDSF):
                 cache.note_miss_cost(i, d[i] + (0 if base_resident else L[b]))
             cache.on_serve(i, L[i])
         if live:
             m["pulls"] += 1
+            pull_origin.append(p_origin / GB)
+            pull_decode.append(p_decode)
 
     n = max(m["pulls"], 1)
     origin = m["delta_only"] + m["delta_with_base"] + m["base_bytes"] + m["raw_bytes"]
@@ -386,7 +394,9 @@ def run_cell(argsp):
                 decode_s_per_pull=m["decode_s"] / n,
                 base_logical=m["base_logical"] / n,
                 base_physical=m["base_physical"] / n,
-                logical_gb_per_pull=m["req_bytes"] / n / GB)
+                logical_gb_per_pull=m["req_bytes"] / n / GB,
+                pull_origin_gb=[round(v, 4) for v in pull_origin],
+                pull_decode_s=[round(v, 3) for v in pull_decode])
 
 
 def main():

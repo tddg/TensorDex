@@ -20,19 +20,36 @@ implements) and `eval/CACHING_EXPERIMENTS.md`.
 > reconstruction-aware policy yet moves 1.7× the origin bytes; hit ratio
 > mis-ranks policies at every capacity. **(c)** The gap is the avoidable
 > traffic: repeated refetch of absent bases dominates hit-oriented policies'
-> origin bytes. **(d)** But base-heavy allocations pay in decode CPU: which
-> policy sustains the highest throughput depends on where the deployment
-> sits in the (origin bandwidth × decode capacity) plane — there is no
-> universally correct cache content.
+> origin bytes. **(d)** The inversion reaches the user: at the cache node's
+> operating point (1.7 GB/s origin bandwidth, 32 decode cores) the
+> higher-hit policies deliver 2.1–2.3× *slower* median model pulls
+> (12.6 s LRU / 11.5 s GDSF vs 5.4 s reconstruction-aware), because pull
+> latency is dominated by origin fetch time, which hits do not track.
+> **(e)** But base-heavy allocations pay in decode CPU: which policy
+> sustains the highest throughput depends on where the deployment sits in
+> the (origin bandwidth × decode capacity) plane — there is no universally
+> correct cache content. Cache capacities tested: 25, 50, 100, 200, 400 GB
+> (labeled along each curve in (b); (c)–(e) shown at 100 GB).
 
 ## Headline numbers (seed 42, α = 1.0)
 
-| policy (100 GB) | direct hit ratio | origin GB/pull | decode s/pull |
-|---|---:|---:|---:|
-| LRU (hit-oriented) | 18.7% | 15.96 | 53.4 |
-| GDSF (static cost-aware) | **35.0%** | 12.67 | **44.0** |
-| base-biased (50% pinned) | 11.1% | 9.82 | 57.3 |
-| reconstruction-aware | 7.8% | **7.46** | 61.9 |
+Cache capacities tested: **25 / 50 / 100 / 200 / 400 GB** per policy
+(20 cells). Headline cell = 100 GB. Latency columns use the serial
+fetch+decode model at the i4i operating point (fetch = origin bytes ÷
+1.7 GB/s node bandwidth; decode = core-s ÷ 32 cores), quantiles over the
+10,000-pull per-pull distribution:
+
+| policy (100 GB) | direct hit ratio | origin GB/pull | decode core-s/pull | fetch p50 (s) | decode p50 (s) | pull p50 (s) | pull p95 (s) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| LRU (hit-oriented) | 18.7% | 15.96 | 53.4 | 10.5 | 2.0 | 12.6 | 15.2 |
+| GDSF (static cost-aware) | **35.0%** | 12.67 | **44.0** | 9.7 | 1.8 | 11.5 | 14.3 |
+| base-biased (50% pinned) | 11.1% | 9.82 | 57.3 | 4.6 | 2.1 | 6.4 | 13.2 |
+| reconstruction-aware | 7.8% | **7.46** | 61.9 | 3.4 | 2.1 | **5.4** | **12.7** |
+
+Latency reading: at this operating point pull time is fetch-dominated, so
+the traffic inversion becomes a 2.1–2.3× median-latency win for the
+low-hit-ratio policies; the p95 gap is narrower (12.7 vs 15.2 s) because
+tail pulls are giant cold models that miss everywhere under every policy.
 
 - The inversion persists at every capacity 25→400 GB; at 400 GB the
   reconstruction-aware policy reaches 44.3% hits **and** 3.26 GB/pull —
@@ -55,9 +72,13 @@ implements) and `eval/CACHING_EXPERIMENTS.md`.
   the request process (sequential pulls; intra-pull base dedup, no
   cross-pull single-flight). Label in the paper: *catalog-grounded,
   scenario-driven trace*; swap in HF download weights for headline runs.
-- Panel (d) is analytic over measured per-pull demand vectors: sustainable
-  throughput μ_p = min(B_S3/bytes_pp, cores/decode_pp) per policy; the cell
-  color is argmax. No queueing model is claimed.
+- Panel (d) latency is the serial fetch+decode model over per-pull
+  distributions (upper bound; perfect pipelining approaches
+  max(fetch, decode) instead of the sum — at this operating point fetch
+  dominates, so the ordering is unchanged). Panel (e) is analytic over
+  measured per-pull demand vectors: sustainable throughput
+  μ_p = min(B_S3/bytes_pp, cores/decode_pp) per policy; the cell color is
+  argmax. No queueing model is claimed.
 - Policies are simulator implementations of the run-book's `lru`, `gdsf`,
   `basepin`(≈base-biased), and a simplified `dagv` (recon-aware: unified
   EWMA value-density over bases and targets, state-dependent). The system

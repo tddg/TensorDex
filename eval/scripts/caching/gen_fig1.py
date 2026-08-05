@@ -84,12 +84,15 @@ def panel_b(ax, results, annotate_cap):
                    color=st["color"], marker=st["marker"], zorder=3,
                    edgecolors="white", linewidths=0.4)
         if pol == "lru":
-            ax.annotate(f"{rows[0]['cap_gb']:.0f} GB", (x[0], y[0]),
-                        textcoords="offset points", xytext=(-2, 5),
-                        fontsize=5.2, color=MUTED, ha="right")
-            ax.annotate(f"{rows[-1]['cap_gb']:.0f} GB", (x[-1], y[-1]),
-                        textcoords="offset points", xytext=(4, 3),
-                        fontsize=5.2, color=MUTED)
+            for r, xi, yi in zip(rows, x, y):
+                ax.annotate(f"{r['cap_gb']:.0f}", (xi, yi),
+                            textcoords="offset points", xytext=(-1, 5),
+                            fontsize=5.0, color=MUTED, ha="right")
+        if pol == "recon":
+            for r, xi, yi in zip(rows, x, y):
+                ax.annotate(f"{r['cap_gb']:.0f} GB", (xi, yi),
+                            textcoords="offset points", xytext=(3, -8),
+                            fontsize=5.0, color=MUTED)
     a = next(r for r in results
              if r["policy"] == "gdsf" and r["cap_gb"] == annotate_cap)
     b = next(r for r in results
@@ -107,7 +110,7 @@ def panel_b(ax, results, annotate_cap):
             fontsize=5.8, color=INK, ha="left")
     ax.set_xlabel("direct hit ratio (%)")
     ax.set_ylabel("origin bytes / model pull (GB)")
-    ax.set_title("(b) More hits can cost more\n(marker size = capacity)",
+    ax.set_title("(b) More hits can cost more\n(capacities 25–400 GB labeled)",
                  loc="left")
     ax.grid(True, color=GRID, lw=0.4)
     ax.set_axisbelow(True)
@@ -145,6 +148,51 @@ def panel_c(ax, results, cap):
     ax.set_ylim(0, max(bottom) * 1.22)
 
 
+def panel_e(ax, results, cap, bw_gbps, cores):
+    """Model-pull latency at the operating point: serial fetch+decode model.
+
+    fetch_t = origin bytes / node origin bandwidth; decode_t = decode
+    core-seconds / cores. Serial sum is an upper bound (perfect pipelining
+    approaches max of the two); quantiles over per-pull distributions.
+    """
+    order = ["lru", "gdsf", "basebias", "recon"]
+    rows = {r["policy"]: r for r in results if r["cap_gb"] == cap}
+    xs = np.arange(len(order))
+    C_FETCH, C_DEC = "#6da7ec", "#eda100"
+    t95_max = 0.0
+    for i, p in enumerate(order):
+        og = np.array(rows[p]["pull_origin_gb"])
+        ds = np.array(rows[p]["pull_decode_s"])
+        fetch_t = og / bw_gbps
+        dec_t = ds / cores
+        tot = fetch_t + dec_t
+        f50, d50 = np.median(fetch_t), np.median(dec_t)
+        t95 = np.quantile(tot, 0.95)
+        ax.bar(i, f50, 0.6, color=C_FETCH, edgecolor="white", linewidth=0.6,
+               label="origin fetch (p50)" if i == 0 else None)
+        ax.bar(i, d50, 0.6, bottom=f50, color=C_DEC, edgecolor="white",
+               linewidth=0.6, label="decode (p50)" if i == 0 else None)
+        ax.plot([i, i], [f50 + d50, t95], color=INK2, lw=0.7, zorder=4)
+        ax.plot(i, t95, marker="v", color=INK2, ms=3, zorder=4,
+                label="p95 total" if i == 0 else None)
+        ax.text(i + 0.09, t95, f"{t95:.0f}", ha="left", va="center",
+                fontsize=5.4, color=INK2)
+        ax.text(i - 0.09, f50 + d50 + 0.2, f"{f50 + d50:.1f}", ha="right",
+                fontsize=5.8, color=INK)
+        t95_max = max(t95_max, t95)
+    ax.set_xticks(xs)
+    ax.set_xticklabels(["LRU", "GDSF", "base-\nbiased", "recon-\naware"],
+                       fontsize=6)
+    ax.set_ylabel(f"model-pull latency (s)  ({cap:.0f} GB cache)")
+    ax.set_title(f"(d) Latency at the operating point\n"
+                 f"({bw_gbps:g} GB/s origin, {cores} cores)", loc="left")
+    ax.legend(frameon=False, fontsize=5.2, loc="upper right",
+              handlelength=1.0, borderaxespad=0.1)
+    ax.grid(True, axis="y", color=GRID, lw=0.4)
+    ax.set_axisbelow(True)
+    ax.set_ylim(0, t95_max * 1.32)
+
+
 def panel_d(ax, results, cap, op_point):
     rows = [r for r in results if r["cap_gb"] == cap]
     pols = [r["policy"] for r in rows]
@@ -180,7 +228,7 @@ def panel_d(ax, results, cap, op_point):
             ha="center", va="center", fontsize=6, color=INK, weight="bold")
     ax.set_xlabel("origin (S3) bandwidth (GB/s)")
     ax.set_ylabel("decode capacity (cores)")
-    ax.set_title("(d) The best policy depends\non the bottleneck", loc="left")
+    ax.set_title("(e) The best policy depends\non the bottleneck", loc="left")
 
 
 def main():
@@ -193,13 +241,14 @@ def main():
     data = json.load(open(args.results))
     results, anatomy = data["results"], data["anatomy"]
 
-    fig, axes = plt.subplots(1, 4, figsize=(13.2, 2.9))
-    fig.subplots_adjust(left=0.05, right=0.995, top=0.82, bottom=0.17,
-                        wspace=0.34)
+    fig, axes = plt.subplots(1, 5, figsize=(16.4, 2.9))
+    fig.subplots_adjust(left=0.04, right=0.995, top=0.82, bottom=0.17,
+                        wspace=0.36)
     panel_a(axes[0], anatomy)
     panel_b(axes[1], results, args.cap)
     panel_c(axes[2], results, args.cap)
-    panel_d(axes[3], results, args.cap, op_point=(1.7, 32))
+    panel_e(axes[3], results, args.cap, bw_gbps=1.7, cores=32)
+    panel_d(axes[4], results, args.cap, op_point=(1.7, 32))
 
     handles = [Line2D([], [], color=POL[p]["color"], marker=POL[p]["marker"],
                       ls="-", lw=1, ms=4, label=POL[p]["label"])
