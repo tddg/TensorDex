@@ -135,7 +135,7 @@ Peak RAM ≈ 190 GB of 247 GB during the giant-tensor phase.</p>
 <li><b>Against the published artifact (TensorX):</b> on the 195,839 pairs (12.79 TB) where the paper&rsquo;s results.db holds a measured tratio for the identical (target, base): our weighted tratio 0.3063 vs published 0.3068; per-pair relative difference 0.0000% at p50 and p95; 98.2% byte-identical (the 1.77% that differ are sub-MB tensors, 91% smaller on our newer zstd).</li>
 <li><b>Paper claims:</b> TensorDex-TX <b>65.1%</b> reproduced exactly offline from the AE cache; realized 60.9% here, the 4.2-point gap fully attributed to corpus decay (5.31 TB of registered tensors — including 1,058 of the paper&rsquo;s 7,948 bases — have no blobs in S3).</li>
 <li><b>FM++ (measurement-only; hub stays TensorX):</b> 500-pair stratified sample — 500/500 roundtrips byte-exact, 400/400 published fratios reproduced <i>byte-identically</i>; sample-informed projection validates the <b>70.5%</b> claim at <b>71.1%</b> on the paper corpus (66.8% on the surviving corpus).</li>
-<li><b>Whole-model reconstruction:</b> random fully-servable models rebuilt end-to-end from the hybrid layout (deltas from <code>compressed_full/</code> + bases from <code>tensordb/</code>), every tensor hash-verified — sampling run in progress at publish time; see repo report for the final stamp.</li>
+<li><b>Whole-model reconstruction:</b> <span class="ok">8/8 random servable models rebuilt byte-exact</span> end-to-end from the hybrid layout (deltas from <code>compressed_full/</code> + bases from <code>tensordb/</code>), every tensor hash-verified; cold single-client read amplification 1.07–1.55. Of 2,892 ready models, 2,530 (87.5%) are fully servable; 362 lost ≥1 tensor to GC.</li>
 </ul>
 </div>
 

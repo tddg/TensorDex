@@ -106,8 +106,12 @@ unservable; per-model missing-blob flags are recorded in the catalog
   published-tratio join), per-pair ledger (sizes, ratios, stage timings),
   logs.
 
-Sampled whole-model reconstruction verification: see `verify_models.py`
-output appended below.
+**Sampled whole-model reconstruction verification (complete): 8/8 random
+servable models rebuilt end-to-end from the hybrid layout — every tensor
+(2,283 deltas + raw) hash-verified byte-exact.** Cold single-client read
+amplification 1.07–1.55 (delta + base fetched, no base cache). Of 2,892
+ready models, **2,530 (87.5%) are fully servable**; 362 have at least one
+GC'd tensor (§4).
 
 ## 6. Research notes for FAST'27
 
