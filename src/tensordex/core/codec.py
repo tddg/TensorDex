@@ -182,7 +182,22 @@ def save_compressed(
     tmp_path = Path(tmp_path)
     try:
         save_file(payload, str(tmp_path), metadata=metadata)
+        # Durability ordering: the caller updates SQLite (WAL,
+        # synchronous=NORMAL) right after this returns, and that commit can
+        # reach disk before these pages do — leaving the catalog describing
+        # a delta blob whose bytes were lost. fsync the file before the
+        # rename, and the directory after it (for the dirent).
+        fd = os.open(tmp_path, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
         os.replace(tmp_path, path)
+        dir_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
     finally:
         if tmp_path.exists():
             tmp_path.unlink(missing_ok=True)

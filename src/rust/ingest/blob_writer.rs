@@ -93,11 +93,23 @@ pub fn write_blob(
     let bytes = safetensors::serialize(&tensors, &Some(metadata))
         .map_err(|e| anyhow::anyhow!("serialize safetensors: {}", e))?;
 
-    // Write + fsync not strictly needed (ingest is idempotent on crash — the
-    // tensor row only lands via the final SQL tx). Plain write_all suffices.
+    // fsync IS required for durability ordering: the catalog commits in a
+    // separate SQLite transaction (WAL, synchronous=NORMAL) that can reach
+    // disk before this blob's page-cache contents do. On power loss that
+    // ordering inversion yields a committed tensor row pointing at a
+    // truncated/empty blob — undetectable until a read fails. Sync the file,
+    // then the parent directory (for the dirent), before ingest proceeds to
+    // the SQL phase.
     let mut f = fs::File::create(&path).with_context(|| format!("create blob file {:?}", path))?;
     f.write_all(&bytes)
         .with_context(|| format!("write blob {:?}", path))?;
+    f.sync_all()
+        .with_context(|| format!("fsync blob {:?}", path))?;
+    if let Some(parent) = path.parent() {
+        fs::File::open(parent)
+            .and_then(|d| d.sync_all())
+            .with_context(|| format!("fsync blob dir {:?}", parent))?;
+    }
 
     Ok(blob_relpath(tensor_id).to_string_lossy().to_string())
 }

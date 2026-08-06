@@ -442,24 +442,36 @@ class TensorDex:
                 _cache[tensor_id] = result
             return result
 
-        # Non-local backends keep the original raw-only path for now.
+        # Non-local backends keep the original raw-only path for now. The
+        # verify contract must hold here too — silently skipping it made
+        # ``pull --verify`` against S3 report success on unchecked bytes.
+        def _finish(result: torch.Tensor) -> torch.Tensor:
+            if verify:
+                self._verify_tensor(tensor_id, result)
+            if _cache is not None:
+                _cache[tensor_id] = result
+            return result
+
         expected_shape = self._expected_shape_for_tid(tensor_id)
         uri = self._get_storage_uri_optional(tensor_id)
         supports_id_fallback = isinstance(self.storage_backend, S3StorageBackend)
 
         if uri:
             try:
-                return self.storage_backend.load_tensor(uri)
+                return _finish(self.storage_backend.load_tensor(uri))
+            except IntegrityError:
+                raise
             except (FileNotFoundError, KeyError, RuntimeError, OSError) as first_err:
                 if supports_id_fallback:
                     try:
-                        return self._load_tensor_by_tensor_id(tensor_id, expected_shape)
+                        result = self._load_tensor_by_tensor_id(tensor_id, expected_shape)
                     except Exception:
                         raise first_err
+                    return _finish(result)
                 raise
 
         if supports_id_fallback:
-            return self._load_tensor_by_tensor_id(tensor_id, expected_shape)
+            return _finish(self._load_tensor_by_tensor_id(tensor_id, expected_shape))
 
         raise KeyError(f"Tensor {tensor_id} missing storage URI")
 
@@ -803,22 +815,43 @@ class TensorDex:
 
         target_shape = tuple(int(x) for x in target_tensor.shape)
         target_dtype_name = str(dtype).removeprefix("torch.")
-        new_size = save_compressed(
-            target_path,
-            codec=codec,
-            base_tensor_id=base_tensor_id,
-            item_size=item_size,
-            level=level,
-            target_shape=target_shape,
-            target_dtype=target_dtype_name,
-            compressed_bytes=bytes(compressed),
-        )
+
+        # Ordering is load-bearing. The delta edge is what protects the base
+        # from gc, so it must be durable BEFORE the blob becomes a delta: a
+        # crash after the blob rewrite but before the edge would leave an
+        # unprotected base that the next gc deletes, destroying this tensor.
+        # The reverse failure mode — edge recorded, rewrite never happened —
+        # only over-protects (the blob is still raw and decodes as raw), and
+        # is retracted below on a clean failure.
+        self.metadata.set_tensor_delta(target_tensor_id, base_tensor_id, codec)
+        try:
+            new_size = save_compressed(
+                target_path,
+                codec=codec,
+                base_tensor_id=base_tensor_id,
+                item_size=item_size,
+                level=level,
+                target_shape=target_shape,
+                target_dtype=target_dtype_name,
+                compressed_bytes=bytes(compressed),
+            )
+        except BaseException:
+            # os.replace is atomic, so a failed rewrite left the raw blob
+            # intact; the protective edge is stale — retract it (best
+            # effort: a leaked edge is safe, it only over-protects).
+            try:
+                self.metadata.clear_tensor_delta(target_tensor_id)
+            except Exception:
+                logger.warning(
+                    "Failed to retract stale delta edge for %s; base %s "
+                    "stays over-protected until the edge is cleaned up",
+                    target_tensor_id,
+                    base_tensor_id,
+                )
+            raise
 
         uri = target_path.relative_to(self.storage_backend.root_dir).as_posix()
         self.metadata.update_tensor_storage(target_tensor_id, int(new_size), uri)
-        # Record the delta edge in SQL so gc / manifest never has to read a
-        # blob header to learn what this tensor depends on.
-        self.metadata.set_tensor_delta(target_tensor_id, base_tensor_id, codec)
 
         ratio = (original_bytes / new_size) if new_size else 0.0
         logger.info(

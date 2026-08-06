@@ -58,6 +58,11 @@ impl MetadataStore {
     #[new]
     fn new(path: &str) -> PyResult<Self> {
         let conn = Connection::open(path).map_err(sql_err)?;
+        // WAL allows one writer + N readers, but without a busy timeout a
+        // second writer process gets an immediate SQLITE_BUSY instead of
+        // queueing. 30 s covers any single transaction this store runs.
+        conn.busy_timeout(std::time::Duration::from_secs(30))
+            .map_err(sql_err)?;
         Self::apply_schema(&conn).map_err(sql_err)?;
         Ok(Self {
             conn: Mutex::new(conn),
@@ -571,6 +576,19 @@ impl MetadataStore {
                  base_tensor_id=excluded.base_tensor_id,
                  codec=excluded.codec",
             params![tensor_id, base_tensor_id, codec],
+        )
+        .map_err(sql_err)?;
+        Ok(())
+    }
+
+    /// Remove ``tensor_id``'s delta edge, if any. Used by ``compress_pair``
+    /// to retract a protective edge it recorded ahead of a blob rewrite
+    /// that then failed (the blob is still raw, so the edge is stale).
+    fn clear_tensor_delta(&self, tensor_id: &str) -> PyResult<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM tensor_deltas WHERE tensor_id = ?",
+            params![tensor_id],
         )
         .map_err(sql_err)?;
         Ok(())

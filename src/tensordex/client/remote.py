@@ -229,8 +229,21 @@ def _register_blobs_locally(
         (model_name, p["param"], p["tensor_id"], now) for p in manifest["params"]
     ]
 
+    # Delta edges MUST be mirrored along with the rows: gc's protect set is
+    # ``SELECT DISTINCT base_tensor_id FROM tensor_deltas``, and a base that
+    # is not itself a parameter of any local model has no mapping row — so
+    # without these edges, ``tensordex gc`` on a pulled hub deletes the base
+    # blobs and every dependent delta becomes undecodable.
+    delta_rows = [
+        (b["tensor_id"], b["base_tensor_id"], b["codec"])
+        for b in manifest["blobs"]
+        if b.get("codec") and b.get("base_tensor_id")
+    ]
+
     hub.init_model(model_name)
     hub.metadata.ingest_batch(tensor_rows, mapping_rows)
+    if delta_rows:
+        hub.metadata.backfill_deltas(delta_rows)
     hub.commit_model(model_name)
 
 
